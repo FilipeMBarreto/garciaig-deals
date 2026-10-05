@@ -221,6 +221,21 @@
   "warnings": [
     "Bloco 'até 5 €': só 3 de 4 candidatos disponíveis."
   ],
-  "streamer": null,
+  "streamer": {
+    "id": 16809,
+    "name": "Call of Duty: Modern Warfare 4",
+    "seo_name": "call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store",
+    "price": 65.38,
+    "retail": 90.0,
+    "discount": 28,
+    "avail_date": null,
+    "preorder": false,
+    "is_dlc": false,
+    "is_pc": true,
+    "updated_at": 1790344291,
+    "rank": 0,
+    "release_date": null,
+    "url": "https://www.instant-gaming.com/pt/16809-comprar-call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store/?igr=garciap"
+  },
   "streamer_note": ""
 }
