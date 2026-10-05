@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import re
 from datetime import date, timedelta
+from typing import Iterable
 
 from .models import Game, Week
 
 TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0), ("5", 2.0, 5.0))
 PER_TIER = 4
+TRENDING_COUNT = 4
+UNRANKED = 10_000  # igual a scrape.UNRANKED (rank < UNRANKED = veio de /tendencias/)
 
 _ADJ = r"(?:digital|deluxe|premium|ultimate|gold|complete|collector'?s?|standard|definitive|special|day one|launch)"
 _EDITION_RE = re.compile(
@@ -38,7 +41,8 @@ def _base_order(g: Game):
     return (is_edition(g), g.rank, -g.retail, g.id)
 
 
-def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], today: date) -> Week:
+def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], today: date,
+                exclude_games: Iterable[Game] = ()) -> Week:
     start, end = week_bounds(today)
     warnings: list[str] = []
     base = [g for g in pool if g.is_pc and not g.is_dlc and g.release_date is not None]
@@ -74,8 +78,24 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
             if preorder else "Sem nenhuma pré-venda disponível."
         )
 
+    # Tendências: top de /tendencias/ (sem pausa), sem repetir nada que já esteja na página
+    excluded = list(exclude_games)
+    taken = [g for g in (featured, preorder, *excluded) if g]
+    taken_ids = {g.id for g in taken}
+    taken_families = {family(g.name) for g in taken}
+    by_family: dict[str, Game] = {}
+    for g in pool:
+        if g.rank < UNRANKED and g.is_pc and not g.is_dlc and g.price > 0 and g.id not in taken_ids and family(g.name) not in taken_families:
+            fam = family(g.name)
+            cur = by_family.get(fam)
+            if cur is None or (is_edition(g), g.rank, g.id) < (is_edition(cur), cur.rank, cur.id):
+                by_family[fam] = g
+    trending = sorted(by_family.values(), key=lambda g: (g.rank, g.id))[:TRENDING_COUNT]
+    if len(trending) < TRENDING_COUNT:
+        warnings.append(f"Bloco 'tendências': só {len(trending)} de {TRENDING_COUNT} candidatos disponíveis.")
+
     # Blocos de preço
-    chosen = [g for g in (featured, preorder) if g]
+    chosen = taken + trending
     chosen_ids = {g.id for g in chosen}
     seen_families = {family(g.name) for g in chosen}
     released = [
@@ -99,4 +119,4 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
             warnings.append(f"Bloco 'até {key} €': só {len(picked)} de {PER_TIER} candidatos disponíveis.")
         tiers[key] = picked
 
-    return Week(week_key(today), start, end, featured, preorder, tiers, warnings)
+    return Week(week_key(today), start, end, featured, preorder, tiers, warnings, trending=trending)

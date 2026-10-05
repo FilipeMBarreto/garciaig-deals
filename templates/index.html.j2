@@ -53,6 +53,15 @@
     {% for n in preorder_notes %}<p class="note">{{ n }}</p>{% endfor %}
   </section>
 
+  <section>
+    <h2>🔥 Tendências do Momento{% if trending %} · {{ trending|length }} {{ 'jogo' if trending|length == 1 else 'jogos' }}{% endif %}</h2>
+    {% if trending %}
+    <div class="grid">{% for g in trending %}{{ card(g) }}{% endfor %}</div>
+    {% else %}
+    <p class="empty">Sem candidatos esta semana.</p>
+    {% endif %}
+  </section>
+
   {% for title, games in tiers %}
   <section>
     <h2>{{ title }}{% if games %} · {{ games|length }} {{ 'jogo' if games|length == 1 else 'jogos' }}{% endif %}</h2>

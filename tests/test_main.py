@@ -3,7 +3,7 @@ import re
 from datetime import date
 from pathlib import Path
 import pytest
-from garciaig import main
+from garciaig import main, scrape, select
 
 FIX = Path(__file__).parent / "fixtures"
 TODAY = date(2026, 10, 5)
@@ -230,3 +230,80 @@ def test_note_with_bare_ig_url_never_reaches_site_or_payload(tmp_path):
     assert week.streamer_note == "vê e"
     blob = read(tmp_path, "site/index.html") + read(tmp_path, "data/discord_payload.json")
     assert "1-comprar-x" not in blob and "zzzz" not in blob
+
+
+# ---------- Tendências ----------
+
+def test_end_to_end_trending_block(tmp_path):
+    (tmp_path / "data").mkdir()
+    week = run_pick(tmp_path)
+    assert len(week.trending) == 4
+    assert len({select.family(g.name) for g in week.trending}) == 4
+    assert all(g.rank < scrape.UNRANKED for g in week.trending)
+    assert not {g.id for g in week.trending} & {week.featured.id, week.preorder.id}
+    assert not {g.id for g in week.trending} & {g.id for games in week.tiers.values() for g in games}
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert [g["id"] for g in saved["trending"]] == [g.id for g in week.trending]
+    assert main._week_from_dict(saved) == week
+    hist = json.loads(read(tmp_path, "data/history.json"))
+    assert not {g.id for g in week.trending} & {i for ids in hist["weeks"][0]["tiers"].values() for i in ids}
+    html = read(tmp_path, "site/index.html")
+    assert html.index("Pré-venda da Próxima Semana") < html.index("Tendências do Momento") < html.index("Até 20 €")
+
+
+def test_streamer_pick_is_excluded_from_trending_and_tiers(tmp_path):
+    (tmp_path / "data").mkdir()
+    base = run_pick(tmp_path)
+    top = base.trending[0]
+    (tmp_path / "data" / "streamer_pick.json").write_text(
+        json.dumps({"url": f"https://www.instant-gaming.com/pt/{top.id}-comprar-{top.seo_name}/", "note": ""}), encoding="utf-8")
+    page_html = (f'<meta property="og:title" content="Comprar {top.name} - PC (Steam) - Europe">'
+                 f'<script>window.productModel = {{"prod_id": {top.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": false}};</script>')
+    (tmp_path / "data" / "history.json").unlink()
+    w = run_pick(tmp_path, pick_html=page_html)
+    assert w.streamer.id == top.id
+    assert top.id not in {g.id for g in w.trending}
+    assert len(w.trending) == 4
+
+
+def test_republish_legacy_week_without_trending_raises(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    run_pick(tmp_path)
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    del saved["trending"]
+    (data / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    no_fetch_all(monkeypatch)
+    with pytest.raises(main.NoSavedWeek):
+        main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="")
+
+
+def test_cli_legacy_week_without_trending_falls_back_to_full_run(tmp_path, capsys):
+    assert main.cli(cli_args(tmp_path)) == 0
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    del saved["trending"]
+    (tmp_path / "data" / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    capsys.readouterr()
+    assert main.cli(cli_args(tmp_path, "--republish")) == 0
+    out = capsys.readouterr().out
+    assert "Sem semana guardada para esta semana; a fazer execução completa." in out
+    assert "tendências: 4 jogos" in out
+    assert "trending" in json.loads(read(tmp_path, "data/week.json"))
+
+
+def test_republish_new_streamer_is_dropped_from_trending_and_tiers(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    first = run_pick(tmp_path)
+    victims = [first.trending[0], first.tiers["20"][0]]
+    no_fetch_all(monkeypatch)
+    for v in victims:
+        streamer.save_pick(data / "streamer_pick.json", f"https://www.instant-gaming.com/pt/{v.id}-comprar-{v.seo_name}/")
+        page_html = (f'<meta property="og:title" content="Comprar {v.name} - PC (Steam) - Europe">'
+                     f'<script>window.productModel = {{"prod_id": {v.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": false}};</script>')
+        out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=lambda url: page_html)
+        assert out.streamer.id == v.id
+        assert v.id not in {g.id for g in out.trending}
+        assert v.id not in {g.id for games in out.tiers.values() for g in games}
+        # blocos podem ficar com menos de 4 jogos; nada é reposto
+        assert len(out.trending) <= 4

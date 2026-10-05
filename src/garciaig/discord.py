@@ -44,6 +44,12 @@ def build_payload(week: Week, site_url: str = "") -> dict:
         })
     if week.preorder:
         embeds.append({"title": "⏳ Pré-venda da Próxima Semana", "description": _line(week.preorder), "color": 0x22D3EE})
+    if week.trending:
+        embeds.append({
+            "title": "🔥 Tendências do momento",
+            "description": "\n".join(f"• {_line(g)}" for g in week.trending),
+            "color": 0xEF4444,
+        })
     for key in ("20", "10", "5"):
         games = week.tiers.get(key) or []
         if games:

@@ -105,3 +105,22 @@ def test_tier_grid_shows_only_existing_games_no_placeholders(tmp_path):
     start = html.index("Até 20 €")
     section = html[start:html.index("</section>", start)]
     assert section.count('<article class="card">') == 3 and "empty" not in section
+
+
+def test_trending_section_between_preorder_and_first_tier(tmp_path):
+    w = make_week()
+    w.trending = [game(50 + i, f"Hot {i}", 12) for i in range(4)]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "<h2>🔥 Tendências do Momento · 4 jogos</h2>" in html
+    assert html.index("Pré-venda da Próxima Semana") < html.index("Tendências do Momento") < html.index("Até 20 €")
+    assert "https://www.instant-gaming.com/pt/50-comprar-slug-50/?igr=garciap" in html
+
+
+def test_trending_singular_and_empty(tmp_path):
+    w = make_week()
+    w.trending = [game(50, "Hot", 12)]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "<h2>🔥 Tendências do Momento · 1 jogo</h2>" in html
+    html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    start = html.index("Tendências do Momento")
+    assert "Sem candidatos esta semana." in html[start:html.index("</section>", start)]

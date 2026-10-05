@@ -98,8 +98,8 @@ def test_tiers_exclusive_ranges_and_exclusions():
 
 def test_tier_caps_at_four_orders_by_rank_then_discount_and_dedupes_families():
     pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True)]
-    pool += [mk(100 + i, f"Cheap {i}", 15, date(2026, 9, 1), rank=i) for i in range(8)]
-    pool += [mk(200, "Cheap 0 Deluxe Edition", 18, date(2026, 9, 1), rank=0)]
+    pool += [mk(100 + i, f"Cheap {i}", 15, date(2026, 9, 1), rank=10_000 + i) for i in range(8)]  # sem rank de tendências
+    pool += [mk(200, "Cheap 0 Deluxe Edition", 18, date(2026, 9, 1), rank=10_000)]
     w = select.select_week(pool, set(), set(), TODAY)
     ids = [g.id for g in w.tiers["20"]]
     assert len(ids) == 4 and ids[0] == 100 and 200 not in ids
@@ -129,7 +129,7 @@ def test_real_snapshot_selection():
     assert w.preorder.preorder and w.preorder.price > 0
     for key, lo, hi in select.TIERS:
         assert all(lo < g.price <= hi and not g.is_dlc and g.is_pc for g in w.tiers[key])
-    ids = [g.id for games in w.tiers.values() for g in games] + [w.featured.id, w.preorder.id]
+    ids = [g.id for games in w.tiers.values() for g in games] + [g.id for g in w.trending] + [w.featured.id, w.preorder.id]
     assert len(ids) == len(set(ids))
 
 
@@ -181,3 +181,81 @@ def test_family_collapses_edition_variants(base, edition):
 def test_family_leaves_non_editions_untouched(name):
     assert select.family(name) == name.lower()
     assert not select.is_edition(mk(1, name, 1, TODAY))
+
+
+# ---------- Tendências ----------
+
+def base_pool():
+    return [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True)]
+
+
+def trend(i, name, price=30, rank=None, **kw):
+    return mk(i, name, price, date(2026, 9, 1), rank=i - 300 if rank is None else rank, **kw)
+
+
+def test_trending_takes_top_four_by_rank():
+    pool = base_pool() + [trend(300 + n, f"T{n}", rank=n) for n in (5, 0, 3, 1, 2, 4)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.trending] == [300, 301, 302, 303]
+    assert select.TRENDING_COUNT == 4
+
+
+def test_trending_dedupes_families_preferring_base_edition():
+    pool = base_pool() + [
+        trend(300, "EA Sports FC 27 Deluxe Edition", rank=0),
+        trend(301, "EA Sports FC 27", rank=1),
+        trend(302, "B", rank=2), trend(303, "C", rank=3), trend(304, "D", rank=4), trend(305, "E", rank=5),
+    ]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.trending] == [301, 302, 303, 304]
+
+
+def test_trending_filters_dlc_free_nonpc_unranked_featured_preorder_and_excluded():
+    featured = mk(10, "Now", 40, date(2026, 10, 6), preorder=True, rank=0)
+    pre = mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True, rank=1)
+    pick = mk(900, "Pick", 20, date(2026, 9, 1), rank=2)
+    pick_edition = mk(901, "Pick Deluxe Edition", 30, date(2026, 9, 1), rank=3)
+    pool = [featured, pre, pick, pick_edition,
+            trend(300, "DLC", rank=4, dlc=True), trend(301, "Free", price=0, rank=5), trend(302, "Console", rank=6, pc=False),
+            trend(303, "Unranked", rank=10_000),
+            trend(304, "Ok1", rank=7), trend(305, "Ok2", rank=8), trend(306, "Ok3", rank=9), trend(307, "Ok4", rank=10), trend(308, "Ok5", rank=11)]
+    w = select.select_week(pool, set(), set(), TODAY, exclude_games=[pick])
+    assert [g.id for g in w.trending] == [304, 305, 306, 307]
+
+
+def test_trending_allows_preorders_and_ignores_pause():
+    pool = base_pool() + [trend(300, "Pre", rank=0, preorder=True)] + [trend(301 + n, f"T{n}", rank=n + 1) for n in range(3)]
+    w = select.select_week(pool, {300, 301, 302, 303}, set(), TODAY)
+    assert [g.id for g in w.trending] == [300, 301, 302, 303]
+
+
+def test_tiers_exclude_trending_ids_and_families_and_streamer():
+    pool = base_pool() + [
+        trend(300, "Hot", price=15, rank=0),
+        mk(301, "Hot Deluxe Edition", 18, date(2026, 9, 1)),
+        mk(302, "Cold", 15, date(2026, 9, 1)),
+        mk(303, "Pick Deluxe Edition", 15, date(2026, 9, 1)),
+    ]
+    pick = mk(900, "Pick", 20, date(2026, 9, 1))
+    w = select.select_week(pool, set(), set(), TODAY, exclude_games=[pick])
+    assert [g.id for g in w.trending] == [300]
+    assert [g.id for g in w.tiers["20"]] == [302]
+
+
+def test_trending_underfilled_warns_without_routing_keywords():
+    pool = base_pool() + [trend(300, "Hot", rank=0)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    msg = "Bloco 'tendências': só 1 de 4 candidatos disponíveis."
+    assert msg in w.warnings
+    low = msg.lower()
+    assert "destaque" not in low and "pré-venda" not in low
+    assert len(w.trending) == 1
+
+
+def test_real_snapshot_trending():
+    h = scrape.load_offline(Path(__file__).parent / "fixtures")
+    w = select.select_week(scrape.build_pool(h["trend"], h["pre"], h["upcoming"]), set(), set(), TODAY)
+    assert len(w.trending) == 4
+    assert all(g.rank < scrape.UNRANKED for g in w.trending)
+    assert len({select.family(g.name) for g in w.trending}) == 4
+    assert not {g.id for g in w.trending} & {w.featured.id, w.preorder.id}

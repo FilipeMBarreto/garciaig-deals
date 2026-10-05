@@ -46,6 +46,7 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
         updated=fmt_date(today),
         streamer=_card(week.streamer) if week.streamer else None,
         streamer_note=week.streamer_note.strip() if week.streamer else "",
+        trending=[_card(g) for g in week.trending],
         featured=_card(week.featured) if week.featured else None,
         preorder=_card(week.preorder) if week.preorder else None,
         featured_notes=_notes(week, "destaque"),

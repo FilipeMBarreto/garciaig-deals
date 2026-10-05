@@ -137,3 +137,20 @@ def test_guard_rejects_unmarked_instant_gaming_url_anywhere():
 def test_guard_ignores_cdn_image_urls_and_trims_punctuation():
     p = discord.build_payload(make_week())  # embed.image usa gaming-cdn.com
     assert "gaming-cdn.com" in json.dumps(p)
+
+
+def test_trending_embed_order_color_and_links():
+    w = make_week()
+    w.trending = [game(50 + i, f"Hot [{i}]", 12) for i in range(4)]
+    p = discord.build_payload(w)
+    titles = [e["title"] for e in p["embeds"]]
+    assert titles.index("🔥 Tendências do momento") == titles.index("⏳ Pré-venda da Próxima Semana") + 1
+    assert titles.index("🔥 Tendências do momento") < next(i for i, t in enumerate(titles) if "até 20" in t.lower())
+    e = p["embeds"][titles.index("🔥 Tendências do momento")]
+    assert e["color"] == 0xEF4444 and e["description"].count("• [") == 4 and "Hot \\[0\\]" in e["description"]
+    links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", json.dumps(p, ensure_ascii=False))
+    assert len(links) == 3 + 4 and all(l.endswith("?igr=garciap") for l in links)
+
+
+def test_trending_embed_omitted_when_empty():
+    assert not any("Tendências" in e["title"] for e in discord.build_payload(make_week())["embeds"])

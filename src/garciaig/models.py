@@ -41,3 +41,4 @@ class Week:
     warnings: list[str] = field(default_factory=list)
     streamer: Game | None = None
     streamer_note: str = ""
+    trending: list[Game] = field(default_factory=list)
