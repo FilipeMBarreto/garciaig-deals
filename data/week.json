@@ -99,22 +99,6 @@
         "rank": 25,
         "release_date": "2026-08-06",
         "url": "https://www.instant-gaming.com/pt/23124-comprar-restory-chill-electronics-repairs-pc-steam/?igr=garciap"
-      },
-      {
-        "id": 14369,
-        "name": "Solarpunk",
-        "seo_name": "solarpunk-pc-steam",
-        "price": 12.59,
-        "retail": 25.91,
-        "discount": 45,
-        "avail_date": 1780876800,
-        "preorder": false,
-        "is_dlc": false,
-        "is_pc": true,
-        "updated_at": 1780990361,
-        "rank": 27,
-        "release_date": "2026-06-08",
-        "url": "https://www.instant-gaming.com/pt/14369-comprar-solarpunk-pc-steam/?igr=garciap"
       }
     ],
     "10": [
@@ -181,22 +165,6 @@
         "rank": 50,
         "release_date": "2026-07-30",
         "url": "https://www.instant-gaming.com/pt/15121-comprar-quasimorph-pc-jogo-steam/?igr=garciap"
-      },
-      {
-        "id": 21540,
-        "name": "Gamer Stop Simulator",
-        "seo_name": "gamer-stop-simulator-pc-steam",
-        "price": 5.69,
-        "retail": 12.99,
-        "discount": 51,
-        "avail_date": 1790640899,
-        "preorder": false,
-        "is_dlc": false,
-        "is_pc": true,
-        "updated_at": 1780298708,
-        "rank": 10000,
-        "release_date": "2026-09-29",
-        "url": "https://www.instant-gaming.com/pt/21540-comprar-gamer-stop-simulator-pc-steam/?igr=garciap"
       }
     ],
     "5": [
@@ -248,11 +216,11 @@
         "release_date": "2026-09-09",
         "url": "https://www.instant-gaming.com/pt/23895-comprar-super-glitch-dash-pc-steam/?igr=garciap"
       }
-    ],
-    "2": []
+    ]
   },
   "warnings": [
-    "Bloco 'até 5 €': só 3 de 5 candidatos disponíveis.",
-    "Bloco 'até 2 €': só 0 de 5 candidatos disponíveis."
-  ]
+    "Bloco 'até 5 €': só 3 de 4 candidatos disponíveis."
+  ],
+  "streamer": null,
+  "streamer_note": ""
 }
