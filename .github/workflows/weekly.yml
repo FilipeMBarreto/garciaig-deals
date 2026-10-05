@@ -2,7 +2,7 @@ name: Atualização semanal
 
 on:
   schedule:
-    - cron: "0 8 * * 1"   # segundas-feiras, 08:00 UTC
+    - cron: "0 8 * * *"   # PoC: todos os dias, 08:00 UTC (produção: "0 8 * * 1", segundas-feiras)
   workflow_dispatch:
 
 permissions:
