@@ -11,7 +11,7 @@ import requests
 from . import affiliate
 from .fmt import fmt_price
 from .models import Game, Week
-from .render import TIER_TITLES
+from .render import NO_PRICE, TIER_TITLES
 
 
 def _md(text: str) -> str:
@@ -19,11 +19,22 @@ def _md(text: str) -> str:
 
 
 def _line(g: Game) -> str:
-    return f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{fmt_price(g.price)}**"
+    price = fmt_price(g.price) if g.price > 0 else NO_PRICE
+    return f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{price}**"
 
 
 def build_payload(week: Week, site_url: str = "") -> dict:
     embeds = []
+    if week.streamer:
+        description = _line(week.streamer)
+        if week.streamer_note.strip():
+            description += f"\n\n> {_md(week.streamer_note.strip())}"
+        embeds.append({
+            "title": "🎙️ Destaque do streamer",
+            "description": description,
+            "color": 0xF59E0B,
+            "image": {"url": week.streamer.cover_url},
+        })
     if week.featured:
         embeds.append({
             "title": "⭐ Destaque da Semana",
@@ -33,7 +44,7 @@ def build_payload(week: Week, site_url: str = "") -> dict:
         })
     if week.preorder:
         embeds.append({"title": "⏳ Pré-venda da Próxima Semana", "description": _line(week.preorder), "color": 0x22D3EE})
-    for key in ("20", "10", "5", "2"):
+    for key in ("20", "10", "5"):
         games = week.tiers.get(key) or []
         if games:
             embeds.append({
@@ -45,8 +56,11 @@ def build_payload(week: Week, site_url: str = "") -> dict:
     if site_url:
         content += f"\nTudo num só sítio: {site_url}"
     payload = {"content": content, "embeds": embeds, "allowed_mentions": {"parse": []}}
-    links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", json.dumps(payload, ensure_ascii=False))
-    affiliate.assert_all_affiliate(links)
+    text = json.dumps(payload, ensure_ascii=False)
+    links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", text)
+    # qualquer outro URL da Instant Gaming (ex.: solto num comentário) também tem de ter o código
+    stray = [u.rstrip(").,;:!?\"'\\]*") for u in re.findall(r"https?://[^\s\"\\<>]+", text) if "instant-gaming.com" in u.lower()]
+    affiliate.assert_all_affiliate(links + stray)
     return payload
 
 

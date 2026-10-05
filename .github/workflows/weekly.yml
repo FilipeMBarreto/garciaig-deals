@@ -4,6 +4,20 @@ on:
   schedule:
     - cron: "0 8 * * *"   # PoC: todos os dias, 08:00 UTC (produção: "0 8 * * 1", segundas-feiras)
   workflow_dispatch:
+    inputs:
+      streamer_url:
+        description: "Link do jogo na Instant Gaming (destaque do streamer)"
+        type: string
+        required: false
+      streamer_note:
+        description: "Comentário do streamer (opcional)"
+        type: string
+        required: false
+      clear_streamer:
+        description: "Remover o destaque do streamer"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -15,15 +29,53 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      post_discord: ${{ steps.mode.outputs.post_discord }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - run: python -m garciaig.main
+      # Os inputs do formulário só entram por `env:` (nunca dentro do script) e as variáveis vão sempre entre aspas.
+      - name: Atualizar a escolha do streamer
+        env:
+          STREAMER_URL: ${{ inputs.streamer_url }}
+          STREAMER_NOTE: ${{ inputs.streamer_note }}
+          CLEAR_STREAMER: ${{ inputs.clear_streamer }}
+        run: |
+          if [ "$CLEAR_STREAMER" = "true" ]; then
+            python -m garciaig.streamer clear
+          elif [ -n "$STREAMER_URL" ]; then
+            python -m garciaig.streamer set --url="$STREAMER_URL" --note="$STREAMER_NOTE"
+          fi
+      - name: Decidir o modo (execução completa ou só republicar)
+        id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          STREAMER_URL: ${{ inputs.streamer_url }}
+          CLEAR_STREAMER: ${{ inputs.clear_streamer }}
+        run: |
+          republish=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && { [ -n "$STREAMER_URL" ] || [ "$CLEAR_STREAMER" = "true" ]; }; then
+            republish=true
+          fi
+          post_discord=true
+          if [ "$republish" = "true" ]; then
+            post_discord=false
+          fi
+          echo "republish=$republish" >> "$GITHUB_OUTPUT"
+          echo "post_discord=$post_discord" >> "$GITHUB_OUTPUT"
+      - name: Gerar o site
         env:
           SITE_URL: ${{ vars.SITE_URL }}
+          REPUBLISH: ${{ steps.mode.outputs.republish }}
+        run: |
+          if [ "$REPUBLISH" = "true" ]; then
+            python -m garciaig.main --republish
+          else
+            python -m garciaig.main
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -34,9 +86,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: weekly-data
+          if-no-files-found: ignore
           path: |
             data/history.json
             data/week.json
+            data/streamer_pick.json
 
   deploy:
     needs: build
@@ -58,6 +112,10 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      # O artefacto é a fonte de verdade: se a escolha do streamer foi removida, não vem lá,
+      # por isso apagamos a cópia do checkout antes de restaurar o artefacto.
+      - name: Remover a escolha do streamer do checkout (o artefacto repõe-na se existir)
+        run: rm -f data/streamer_pick.json
       - uses: actions/download-artifact@v4
         with:
           name: weekly-data
@@ -66,11 +124,13 @@ jobs:
         run: |
           git config user.name "garciaig-bot"
           git config user.email "garciaig-bot@users.noreply.github.com"
-          git add data/history.json data/week.json
+          git add -A data/
           git diff --cached --quiet || (git commit -m "chore: atualização semanal" && git push)
 
   notify:
-    needs: deploy
+    # `build` dá o output post_discord; `deploy` garante a ordem e que não corre se o deploy falhar.
+    needs: [build, deploy]
+    if: needs.build.outputs.post_discord == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

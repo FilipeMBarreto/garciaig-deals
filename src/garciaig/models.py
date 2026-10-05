@@ -39,3 +39,5 @@ class Week:
     preorder: Game | None
     tiers: dict[str, list[Game]]
     warnings: list[str] = field(default_factory=list)
+    streamer: Game | None = None
+    streamer_note: str = ""

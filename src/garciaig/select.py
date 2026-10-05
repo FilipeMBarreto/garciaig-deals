@@ -5,8 +5,8 @@ from datetime import date, timedelta
 
 from .models import Game, Week
 
-TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0), ("5", 2.0, 5.0), ("2", 0.0, 2.0))
-PER_TIER = 5
+TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0), ("5", 2.0, 5.0))
+PER_TIER = 4
 
 _ADJ = r"(?:digital|deluxe|premium|ultimate|gold|complete|collector'?s?|standard|definitive|special|day one|launch)"
 _EDITION_RE = re.compile(

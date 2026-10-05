@@ -84,7 +84,7 @@ def test_tiers_exclusive_ranges_and_exclusions():
         mk(20, "T20", 15, date(2026, 9, 1)),
         mk(21, "T10 edge", 10, date(2026, 9, 1)),
         mk(22, "T5", 4.99, date(2026, 9, 1)),
-        mk(23, "T2", 2, date(2026, 9, 1)),
+        mk(23, "T2", 2, date(2026, 9, 1)),  # 2 € exatos: fora de todos os escalões
         mk(24, "Free", 0, date(2026, 9, 1)),
         mk(25, "DLC", 3, date(2026, 9, 1), dlc=True),
         mk(26, "Console", 3, date(2026, 9, 1), pc=False),
@@ -93,24 +93,24 @@ def test_tiers_exclusive_ranges_and_exclusions():
     ]
     w = select.select_week(pool, recent_ids={27}, preorder_ids=set(), today=TODAY)
     ids = {k: [g.id for g in v] for k, v in w.tiers.items()}
-    assert ids == {"20": [20], "10": [21], "5": [22], "2": [23]}
+    assert ids == {"20": [20], "10": [21], "5": [22]}
 
 
-def test_tier_caps_at_five_orders_by_rank_then_discount_and_dedupes_families():
+def test_tier_caps_at_four_orders_by_rank_then_discount_and_dedupes_families():
     pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True)]
     pool += [mk(100 + i, f"Cheap {i}", 15, date(2026, 9, 1), rank=i) for i in range(8)]
     pool += [mk(200, "Cheap 0 Deluxe Edition", 18, date(2026, 9, 1), rank=0)]
     w = select.select_week(pool, set(), set(), TODAY)
     ids = [g.id for g in w.tiers["20"]]
-    assert len(ids) == 5 and ids[0] == 100 and 200 not in ids
-    assert ids == [100, 101, 102, 103, 104]
+    assert len(ids) == 4 and ids[0] == 100 and 200 not in ids
+    assert ids == [100, 101, 102, 103]
 
 
 def test_underfilled_tier_warns_never_pads():
-    pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True), mk(1, "One", 1.5, date(2026, 9, 1))]
+    pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True), mk(1, "One", 3, date(2026, 9, 1))]
     w = select.select_week(pool, set(), set(), TODAY)
-    assert [g.id for g in w.tiers["2"]] == [1]
-    assert any("até 2" in x for x in w.warnings) and w.tiers["20"] == []
+    assert [g.id for g in w.tiers["5"]] == [1]
+    assert "Bloco 'até 5 €': só 1 de 4 candidatos disponíveis." in w.warnings and w.tiers["20"] == []
 
 
 def test_featured_and_preorder_excluded_from_tiers():

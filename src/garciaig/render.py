@@ -12,16 +12,20 @@ from .fmt import fmt_date, fmt_price
 from .models import Game, Week
 
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates"
-TIER_TITLES = {"20": "Até 20 €", "10": "Até 10 €", "5": "Até 5 €", "2": "Até 2 €"}
+TIER_TITLES = {"20": "Até 20 €", "10": "Até 10 €", "5": "Até 5 €"}
+
+
+NO_PRICE = "Ver preço na Instant Gaming"
 
 
 def _card(g: Game) -> dict:
+    has_price = g.price > 0
     return {
         "name": g.name,
         "url": affiliate.game_url(g.id, g.seo_name),
         "cover": g.cover_url,
-        "price": fmt_price(g.price),
-        "retail": fmt_price(g.retail) if g.discount > 0 else None,
+        "price": fmt_price(g.price) if has_price else NO_PRICE,
+        "retail": fmt_price(g.retail) if has_price and g.discount > 0 else None,
         "discount": g.discount,
         "date": fmt_date(g.release_date) if g.release_date else None,
         "preorder": g.preorder,
@@ -40,11 +44,13 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
         week_label=week.key,
         period=f"{fmt_date(week.start)} a {fmt_date(week.end)}",
         updated=fmt_date(today),
+        streamer=_card(week.streamer) if week.streamer else None,
+        streamer_note=week.streamer_note.strip() if week.streamer else "",
         featured=_card(week.featured) if week.featured else None,
         preorder=_card(week.preorder) if week.preorder else None,
         featured_notes=_notes(week, "destaque"),
         preorder_notes=_notes(week, "pré-venda"),
-        tiers=[(TIER_TITLES[k], [_card(g) for g in week.tiers[k]]) for k in ("20", "10", "5", "2")],
+        tiers=[(TIER_TITLES[k], [_card(g) for g in week.tiers[k]]) for k in ("20", "10", "5")],
     )
     links = re.findall(r'href="(https://www\.instant-gaming\.com[^"]*)"', html)
     affiliate.assert_all_affiliate(links)

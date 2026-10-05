@@ -13,8 +13,8 @@ def make_week():
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
         featured=game(1, "Star Wars: Galactic Racer", 39.99, preorder=True),
         preorder=game(2, "Planet <Zoo> 2", 38.49, release=1791849600, preorder=True),
-        tiers={"20": [game(3, "A", 15)], "10": [game(4, "B", 8)], "5": [], "2": []},
-        warnings=["Bloco 'até 5 €': só 0 de 5 candidatos disponíveis."],
+        tiers={"20": [game(3, "A", 15)], "10": [game(4, "B", 8)], "5": []},
+        warnings=["Bloco 'até 5 €': só 0 de 4 candidatos disponíveis."],
     )
 
 
@@ -32,8 +32,8 @@ def test_render_escapes_names_and_formats_pt(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "Planet &lt;Zoo&gt; 2" in html and "Planet <Zoo> 2" not in html
     assert "39,99 €" in html
-    assert "Até 20 €" in html and "Até 2 €" in html
-    assert "Sem candidatos esta semana" in html  # blocos vazios (5 € e 2 €)
+    assert "Até 20 €" in html and "Até 2 €" not in html
+    assert "Sem candidatos esta semana" in html  # bloco vazio (5 €)
     assert "2026-W41" in html or "41" in html
 
 
@@ -49,13 +49,13 @@ def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
     w.warnings = [
         "Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.",
         "Sem candidato a destaque <esta> semana.",
-        "Bloco 'até 5 €': só 0 de 5 candidatos disponíveis.",
+        "Bloco 'até 5 €': só 0 de 4 candidatos disponíveis.",
     ]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert '<p class="note">Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.</p>' in html
     assert '<p class="note">Sem candidato a destaque &lt;esta&gt; semana.</p>' in html
     assert "<esta>" not in html
-    assert "só 0 de 5" not in html
+    assert "só 0 de 4" not in html
     assert html.index("Sem candidato a destaque") < html.index("Pré-venda da Próxima Semana") < html.index("Sem pré-venda para")
 
 
@@ -63,3 +63,45 @@ def test_render_heading_has_no_zero_jogos(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "0 jogos" not in html
     assert "<h2>Até 5 €</h2>" in html and "<h2>Até 20 € · 1 jogo</h2>" in html
+
+
+def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
+    w = make_week()
+    w.streamer = game(7, "Pick <b>Game</b>", 12.5)
+    w.streamer_note = "Joguem <script>alert(1)</script> & divirtam-se"
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "🎙️ Destaque do Streamer" in html
+    assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Pré-venda da Próxima Semana")
+    assert "Escolha do streamer" in html and 'class="badge-streamer"' in html
+    assert '<blockquote class="note-streamer">Joguem &lt;script&gt;alert(1)&lt;/script&gt; &amp; divirtam-se</blockquote>' in html
+    assert "<script>" not in html and "Pick &lt;b&gt;Game&lt;/b&gt;" in html
+    assert "https://www.instant-gaming.com/pt/7-comprar-slug-7/?igr=garciap" in html
+
+
+def test_streamer_without_note_has_no_blockquote(tmp_path):
+    w = make_week()
+    w.streamer = game(7, "Pick", 12.5)
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "Destaque do Streamer" in html and "<blockquote" not in html
+
+
+def test_no_streamer_no_section(tmp_path):
+    html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "badge-streamer" not in html and "<blockquote" not in html and "Destaque do Streamer" not in html
+
+
+def test_zero_price_shows_see_price_label(tmp_path):
+    w = make_week()
+    w.streamer = game(7, "Pick", 0)
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "Ver preço na Instant Gaming" in html and "0,00 €" not in html
+    assert html.count("Ver na Instant Gaming") >= 4  # botões mantêm o texto
+
+
+def test_tier_grid_shows_only_existing_games_no_placeholders(tmp_path):
+    w = make_week()
+    w.tiers["20"] = [game(30 + i, f"G{i}", 15) for i in range(3)]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    start = html.index("Até 20 €")
+    section = html[start:html.index("</section>", start)]
+    assert section.count('<article class="card">') == 3 and "empty" not in section

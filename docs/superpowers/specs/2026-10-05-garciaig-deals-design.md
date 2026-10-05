@@ -25,11 +25,11 @@ Não utilizado, por decisão consciente:
 
 Pausa de 2,5 s entre pedidos, User-Agent identificável, 3 pedidos por execução, 1 execução por semana. `?igr=` nunca é usado nos pedidos.
 
-**Limitação conhecida:** o conjunto permitido (~140 jogos de PC já lançados) tem poucos jogos baratos (a 2026-10-05: 64 acima de 20 €, 48 até 20 €, 24 até 10 €, 3 até 5 €, 0 até 2 €). Os blocos "até 5 €" e "até 2 €" ficam incompletos ou vazios, com aviso visível. A solução definitiva é um feed oficial via programa de parceiros.
+**Limitação conhecida:** o conjunto permitido (~140 jogos de PC já lançados) tem poucos jogos baratos (a 2026-10-05: 64 acima de 20 €, 48 até 20 €, 24 até 10 €, 3 até 5 €). O bloco "até 5 €" fica incompleto, com aviso visível. Não existe bloco "até 2 €". A solução definitiva é um feed oficial via programa de parceiros.
 
 ## Estrutura
 ```
-src/garciaig/{affiliate,models,fmt,scrape,select,history,render,discord,main}.py
+src/garciaig/{affiliate,models,fmt,scrape,select,history,render,discord,streamer,main}.py
 templates/{index.html.j2,style.css}   data/history.json   site/
 tests/ (+ fixtures/ com snapshot real)   .github/workflows/weekly.yml
 ```
@@ -41,18 +41,18 @@ Semana ISO (segunda a domingo) da data de execução; o workflow corre à segund
 |---|---|---|
 | Destaque da semana | jogo de PC (não DLC) com lançamento na semana corrente; se não houver, o lançado na semana anterior. Prioridade a jogo que já foi pré-venda destacada; depois edição base, popularidade e PVP | Isento |
 | Pré-venda da semana seguinte | jogo com lançamento na semana ISO seguinte, o mais próximo; se não houver, a pré-venda mais próxima depois (com aviso) | Isento |
-| Até 20 € | 5 jogos lançados, preço em (10, 20] | Sim |
+| Destaque do streamer | escolha manual (`data/streamer_pick.json`, link da Instant Gaming + comentário); só aparece se existir; página lida 1 vez na geração; falha → sem bloco e com aviso | Isento |
+| Até 20 € | 4 jogos lançados, preço em (10, 20] | Sim |
 | Até 10 € | idem, (5, 10] | Sim |
 | Até 5 € | idem, (2, 5] | Sim |
-| Até 2 € | idem, (0, 2] — gratuitos (0 €) excluídos | Sim |
 
-Escalões exclusivos; sem DLCs; ordenação por popularidade (posição em `/tendencias/`), depois desconto. Um jogo (e a sua "família", ex.: edição Deluxe vs. base) não aparece em dois blocos na mesma semana. Se faltarem candidatos, o bloco mostra menos jogos e regista aviso; nunca repete só para encher.
+Escalões exclusivos (jogos até 2 € e gratuitos não entram em nenhum); sem DLCs; ordenação por popularidade (posição em `/tendencias/`), depois desconto. Um jogo (e a sua "família", ex.: edição Deluxe vs. base) não aparece em dois blocos na mesma semana. Se faltarem candidatos, o bloco mostra menos jogos e regista aviso; nunca repete só para encher.
 
 ## Links
 `affiliate.py` é o único sítio que produz URLs publicadas: `https://www.instant-gaming.com/pt/{id}-comprar-{seo_name}/?igr=garciap`. Testes e verificação em runtime falham se um link publicado (site ou Discord) não terminar assim.
 
 ## Histórico
-`data/history.json`: `{"weeks":[{"week","featured","preorder","tiers":{"20":[ids],...}}]}`. Pausa = ids dos blocos de preço das últimas 4 semanas anteriores à atual. Repetir a execução na mesma semana é idempotente (substitui a entrada).
+`data/history.json`: `{"weeks":[{"week","featured","preorder","tiers":{"20":[ids],...}}]}`. Pausa = ids dos blocos de preço das últimas 4 semanas anteriores à atual. Repetir a execução na mesma semana é idempotente (substitui a entrada). Entradas antigas podem ter a chave de escalão `"2"`; continuam a ser lidas e contam para a pausa.
 
 ## Automação
 `weekly.yml`: cron segunda 08:00 UTC + `workflow_dispatch`. Jobs: `build` (gerar, commit de `data/`, artefacto Pages) → `deploy` (Pages) → `notify` (Discord, só se o deploy correu). Webhook em GitHub Secrets (`DISCORD_WEBHOOK_URL`); `SITE_URL` em Variables.

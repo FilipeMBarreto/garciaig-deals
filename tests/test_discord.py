@@ -15,7 +15,7 @@ def make_week():
     return Week(
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
         game(1, "Star [Wars]", 39.99, True), game(2, "Zoo", 38.49, True),
-        {"20": [game(3, "A", 15)], "10": [], "5": [], "2": []},
+        {"20": [game(3, "A", 15)], "10": [], "5": []},
     )
 
 
@@ -35,7 +35,7 @@ def test_payload_links_all_affiliate_and_markdown_safe():
 def test_empty_blocks_are_omitted():
     titles = [e["title"] for e in discord.build_payload(make_week())["embeds"]]
     assert any("Destaque" in t for t in titles) and any("20" in t for t in titles)
-    assert not any("até 2 €" in t.lower() for t in titles)
+    assert not any("até 10 €" in t.lower() or "até 5 €" in t.lower() for t in titles)
 
 
 def test_send_posts_json_and_raises_on_error():
@@ -91,3 +91,49 @@ def test_tier_title_singular_for_one_game():
 
 def test_payload_disables_mentions():
     assert discord.build_payload(make_week())["allowed_mentions"] == {"parse": []}
+
+
+def test_streamer_embed_first_with_escaped_note_and_affiliate_link():
+    w = make_week()
+    w.streamer = game(7, "Pick [Game]", 12.5)
+    w.streamer_note = "Adoro *isto* [já]"
+    p = discord.build_payload(w, "https://garcia.example/")
+    first = p["embeds"][0]
+    assert first["title"] == "🎙️ Destaque do streamer"
+    assert "(https://www.instant-gaming.com/pt/7-comprar-slug-7/?igr=garciap)" in first["description"]
+    assert "Pick \\[Game\\]" in first["description"]
+    assert "Adoro \\*isto\\* \\[já\\]" in first["description"]
+    assert p["embeds"][1]["title"].startswith("⭐")
+    text = json.dumps(p, ensure_ascii=False)
+    links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", text)
+    assert len(links) == 4 and all(l.endswith("?igr=garciap") for l in links)
+    assert len(p["embeds"]) <= 10 and all(len(e["description"]) <= 4096 for e in p["embeds"])
+
+
+def test_no_streamer_no_embed():
+    titles = [e["title"] for e in discord.build_payload(make_week())["embeds"]]
+    assert not any("treamer" in t for t in titles)
+
+
+def test_streamer_zero_price_uses_label():
+    w = make_week()
+    w.streamer = game(7, "Pick", 0)
+    d = discord.build_payload(w)["embeds"][0]["description"]
+    assert "Ver preço na Instant Gaming" in d and "0,00" not in d
+
+
+def test_guard_rejects_unmarked_instant_gaming_url_anywhere():
+    w = make_week()
+    w.streamer = game(7, "Pick", 12.5)
+    w.streamer_note = "vê https://www.instant-gaming.com/pt/1-comprar-x/ já"
+    with pytest.raises(ValueError):
+        discord.build_payload(w)
+    w2 = make_week()
+    w2.preorder = game(2, "Zoo (https://www.instant-gaming.com/pt/5-comprar-z/)", 38.49, True)
+    with pytest.raises(ValueError):
+        discord.build_payload(w2)
+
+
+def test_guard_ignores_cdn_image_urls_and_trims_punctuation():
+    p = discord.build_payload(make_week())  # embed.image usa gaming-cdn.com
+    assert "gaming-cdn.com" in json.dumps(p)
