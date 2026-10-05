@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+site/
+data/discord_payload.json
+.superpowers/
+.DS_Store

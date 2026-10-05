@@ -1,0 +1,87 @@
+name: Atualização semanal
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # segundas-feiras, 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python -m garciaig.main
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: discord-payload
+          path: data/discord_payload.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weekly-data
+          path: |
+            data/history.json
+            data/week.json
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  commit:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: weekly-data
+          path: data
+      - name: Guardar histórico no repositório
+        run: |
+          git config user.name "garciaig-bot"
+          git config user.email "garciaig-bot@users.noreply.github.com"
+          git add data/history.json data/week.json
+          git diff --cached --quiet || (git commit -m "chore: atualização semanal" && git push)
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - uses: actions/download-artifact@v4
+        with:
+          name: discord-payload
+          path: data
+      - run: python -m garciaig.discord data/discord_payload.json
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
