@@ -289,3 +289,15 @@ def test_resolve_cleans_hand_edited_note(tmp_path):
     p.write_text(json.dumps({"url": GOOD, "note": "olha https://www.instant-gaming.com/pt/1-comprar-x/ isto"}), encoding="utf-8")
     _, note, _ = streamer.resolve(p, fetch=lambda u: page())
     assert note == "olha isto"
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Comprar Gears of War: E-Day - PC & XBOX Series X|S (Microsoft Store)", "Gears of War: E-Day"),
+    ("Comprar Call of Duty: Modern Warfare 4 - PC & XBOX Series X|S (Microsoft Store)", "Call of Duty: Modern Warfare 4"),
+    ("Comprar Star Wars: Galactic Racer - PC (Steam) - Europe & USA & Canada", "Star Wars: Galactic Racer"),
+    ("Comprar Transport Fever 3 - Deluxe Edition - PC (Steam) - Europe", "Transport Fever 3 - Deluxe Edition"),
+    ("Comprar Game - Remastered (Edition) - PC (Steam) - Europe", "Game - Remastered (Edition)"),
+])
+def test_real_og_titles(title, expected):
+    g = streamer.parse_product_page(page(title=title), 21378, "slug-fallback-should-not-be-used")
+    assert g.name == expected

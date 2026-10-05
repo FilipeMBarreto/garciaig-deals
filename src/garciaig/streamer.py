@@ -23,7 +23,8 @@ _WARNING = WARNING_PREFIX + ": não foi possível carregar o jogo escolhido; o b
 _HOSTS = {"www.instant-gaming.com", "instant-gaming.com"}
 _PATH_RE = re.compile(r"^/pt/([0-9]+)-comprar-([a-z0-9-]+)/?$", re.ASCII)
 _URL_RE = re.compile(r"https?://\S+|\b(?:www\.)?instant-gaming\.com\S*", re.IGNORECASE)
-_TITLE_RE = re.compile(r"^Comprar\s+(.*?)\s+-\s+[^-]*\([^)]*\)\s+-\s+.*$")
+_PLATFORM = r"(?:PC|Mac|Linux|Xbox|PlayStation|PS[345]|Nintendo|Switch|Steam)\b[^()]*\([^)]*\)"
+_TITLE_RE = re.compile(rf"^Comprar\s+(.*?)\s+-\s+{_PLATFORM}(?:\s+-\s+.*)?$", re.IGNORECASE)
 
 
 def parse_pick_url(url: str) -> tuple[int, str]:
