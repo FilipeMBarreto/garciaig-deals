@@ -5,7 +5,7 @@ on:
     - cron: "0 8 * * *"   # PoC: todos os dias, 08:00 UTC (produção: "0 8 * * 1", segundas-feiras)
   workflow_dispatch:
     inputs:
-      streamer_url:
+      streamer_url: https://www.instant-gaming.com/pt/16809-comprar-call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store/
         description: "Link do jogo na Instant Gaming (destaque do streamer)"
         type: string
         required: false
