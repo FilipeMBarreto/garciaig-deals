@@ -13,8 +13,8 @@ def make_week():
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
         featured=game(1, "Star Wars: Galactic Racer", 39.99, preorder=True),
         preorder=game(2, "Planet <Zoo> 2", 38.49, release=1791849600, preorder=True),
-        tiers={"20": [game(3, "A", 15)], "10": [game(4, "B", 8)], "5": []},
-        warnings=["Bloco 'até 5 €': só 0 de 4 candidatos disponíveis."],
+        tiers={"20": [game(3, "A", 15)], "10": [game(4, "B", 8)]},
+        warnings=["Bloco 'até 10 €': só 0 de 4 candidatos disponíveis."],
     )
 
 
@@ -33,7 +33,7 @@ def test_render_escapes_names_and_formats_pt(tmp_path):
     assert "Planet &lt;Zoo&gt; 2" in html and "Planet <Zoo> 2" not in html
     assert "39,99 €" in html
     assert "Até 20 €" in html and "Até 2 €" not in html
-    assert "Sem candidatos esta semana" in html  # bloco vazio (5 €)
+    assert "Sem candidatos esta semana" in html  # blocos vazios (tendências e descontos)
     assert "2026-W41" in html or "41" in html
 
 
@@ -49,7 +49,7 @@ def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
     w.warnings = [
         "Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.",
         "Sem candidato a destaque <esta> semana.",
-        "Bloco 'até 5 €': só 0 de 4 candidatos disponíveis.",
+        "Bloco 'até 10 €': só 0 de 4 candidatos disponíveis.",
     ]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert '<p class="note">Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.</p>' in html
@@ -62,7 +62,7 @@ def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
 def test_render_heading_has_no_zero_jogos(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "0 jogos" not in html
-    assert "<h2>Até 5 €</h2>" in html and "<h2>Até 20 € · 1 jogo</h2>" in html
+    assert "<h2>Até 10 € · 1 jogo</h2>" in html and "<h2>Até 20 € · 1 jogo</h2>" in html
 
 
 def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
@@ -141,3 +141,17 @@ def test_discounts_section_order_saving_line_only_there_and_empty(tmp_path):
     start = empty.index("Maiores Descontos")
     assert "Sem candidatos esta semana." in empty[start:empty.index("</section>", start)]
     assert "Poupas" not in empty
+
+
+def test_only_two_tier_blocks_and_no_ate_5_text(tmp_path):
+    w = make_week()
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "Até 5" not in html and "até 5" not in html
+    assert "Até 20 €" in html and "Até 10 €" in html
+
+
+def test_legacy_week_with_tier_5_renders_only_two_tiers(tmp_path):
+    w = make_week()
+    w.tiers["5"] = [game(99, "Legacy Cheap", 3)]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "Legacy Cheap" not in html and "Até 5" not in html

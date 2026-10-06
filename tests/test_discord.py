@@ -15,7 +15,7 @@ def make_week():
     return Week(
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
         game(1, "Star [Wars]", 39.99, True), game(2, "Zoo", 38.49, True),
-        {"20": [game(3, "A", 15)], "10": [], "5": []},
+        {"20": [game(3, "A", 15)], "10": []},
     )
 
 
@@ -35,7 +35,7 @@ def test_payload_links_all_affiliate_and_markdown_safe():
 def test_empty_blocks_are_omitted():
     titles = [e["title"] for e in discord.build_payload(make_week())["embeds"]]
     assert any("Destaque" in t for t in titles) and any("20" in t for t in titles)
-    assert not any("até 10 €" in t.lower() or "até 5 €" in t.lower() for t in titles)
+    assert not any("até 10 €" in t.lower() or "até 5" in t.lower() for t in titles)
 
 
 def test_send_posts_json_and_raises_on_error():
@@ -173,3 +173,10 @@ def test_discounts_embed_order_percent_color_and_links():
 
 def test_discounts_embed_omitted_when_empty():
     assert not any("descontos" in e["title"].lower() for e in discord.build_payload(make_week())["embeds"])
+
+
+def test_payload_has_no_tier_5_even_for_legacy_weeks():
+    w = make_week()
+    w.tiers["5"] = [game(99, "Legacy Cheap", 3)]
+    text = json.dumps(discord.build_payload(w), ensure_ascii=False)
+    assert "Legacy Cheap" not in text and "até 5" not in text.lower()

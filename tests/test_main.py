@@ -219,7 +219,7 @@ def test_cli_republish_uses_saved_week_and_prints_streamer(tmp_path, capsys, mon
 def test_cli_prints_only_three_tiers(tmp_path, capsys):
     assert main.cli(cli_args(tmp_path, "--dry-run")) == 0
     out = capsys.readouterr().out
-    assert "até 20 €" in out and "até 5 €" in out and "até 2 €" not in out
+    assert "até 20 €" in out and "até 10 €" in out and "até 5" not in out and "até 2 €" not in out
 
 
 def test_note_with_bare_ig_url_never_reaches_site_or_payload(tmp_path):
@@ -358,3 +358,19 @@ def test_republish_new_streamer_dropped_from_discounts(tmp_path, monkeypatch):
                  f'<script>window.productModel = {{"prod_id": {v.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": false}};</script>')
     out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=lambda url: page_html)
     assert v.id not in {g.id for g in out.discounts} and len(out.discounts) == len(first.discounts) - 1
+
+
+def test_week_json_with_legacy_tier_5_loads_and_republishes_with_two_tiers(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    week = run_pick(tmp_path)
+    assert set(week.tiers) == {"20", "10"}
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    saved["tiers"]["5"] = [saved["featured"]]  # legado: escalão que já não existe
+    (data / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    assert "5" in main._week_from_dict(saved).tiers  # lê sem falhar
+    no_fetch_all(monkeypatch)
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="")
+    html = read(tmp_path, "site/index.html")
+    assert "Até 5" not in html and "Até 20 €" in html and "Até 10 €" in html
+    assert "até 5" not in read(tmp_path, "data/discord_payload.json").lower()

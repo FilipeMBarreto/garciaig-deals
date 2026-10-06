@@ -25,7 +25,7 @@ Não utilizado, por decisão consciente:
 
 Pausa de 2,5 s entre pedidos, User-Agent identificável, 3 pedidos por execução, 1 execução por semana. `?igr=` nunca é usado nos pedidos.
 
-**Limitação conhecida:** o conjunto permitido (~140 jogos de PC já lançados) tem poucos jogos baratos (a 2026-10-05: 64 acima de 20 €, 48 até 20 €, 24 até 10 €, 3 até 5 €). O bloco "até 5 €" fica incompleto, com aviso visível. Não existe bloco "até 2 €". A solução definitiva é um feed oficial via programa de parceiros.
+**Limitação conhecida:** o conjunto permitido (~140 jogos de PC já lançados) tem poucos jogos baratos (a 2026-10-05: 64 acima de 20 €, 48 até 20 €, 24 até 10 €, 3 até 5 €). Os blocos mais baratos (até 5 € e até 2 €) foram removidos porque os dados permitidos não os conseguem encher; o bloco "Maiores Descontos" cobre as ofertas baratas e os jogos até 5 € só aparecem em Tendências, Maiores Descontos, Destaque, etc. Entradas antigas do histórico e do `week.json` com os escalões `"5"`/`"2"` continuam a ser lidas. A solução definitiva é um feed oficial via programa de parceiros.
 
 ## Estrutura
 ```
@@ -46,9 +46,8 @@ Semana ISO (segunda a domingo) da data de execução; o workflow corre à segund
 | Maiores descontos | 4 jogos de PC (não DLC) já lançados, preço > 0 e desconto ≥ 20 %; ordenados por desconto, depois poupança absoluta; uma edição por família. Pausa de 4 semanas (ids guardados em `discounts` no histórico). Não repete jogos de destaque, pré-venda, streamer ou tendências (id e família); os escalões de preço excluem também estes jogos | Sim |
 | Até 20 € | 4 jogos lançados, preço em (10, 20] | Sim |
 | Até 10 € | idem, (5, 10] | Sim |
-| Até 5 € | idem, (2, 5] | Sim |
 
-Escalões exclusivos (jogos até 2 € e gratuitos não entram em nenhum); sem DLCs; ordenação por popularidade (posição em `/tendencias/`), depois desconto. Nenhum jogo aparece duas vezes na página. Um jogo (e a sua "família", ex.: edição Deluxe vs. base) não aparece em dois blocos na mesma semana. Se faltarem candidatos, o bloco mostra menos jogos e regista aviso; nunca repete só para encher.
+Escalões exclusivos (jogos até 5 € e gratuitos não entram em nenhum); sem DLCs; ordenação por popularidade (posição em `/tendencias/`), depois desconto. Nenhum jogo aparece duas vezes na página. Um jogo (e a sua "família", ex.: edição Deluxe vs. base) não aparece em dois blocos na mesma semana. Se faltarem candidatos, o bloco mostra menos jogos e regista aviso; nunca repete só para encher.
 
 ## Links
 `affiliate.py` é o único sítio que produz URLs publicadas: `https://www.instant-gaming.com/pt/{id}-comprar-{seo_name}/?igr=garciap`. Testes e verificação em runtime falham se um link publicado (site ou Discord) não terminar assim.

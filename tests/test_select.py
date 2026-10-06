@@ -93,7 +93,7 @@ def test_tiers_exclusive_ranges_and_exclusions():
     ]
     w = select.select_week(pool, recent_ids={27}, preorder_ids=set(), today=TODAY)
     ids = {k: [g.id for g in v] for k, v in w.tiers.items()}
-    assert ids == {"20": [20], "10": [21], "5": [22]}
+    assert ids == {"20": [20], "10": [21]}  # jogos até 5 € já não têm escalão
 
 
 def test_tier_caps_at_four_orders_by_rank_then_discount_and_dedupes_families():
@@ -107,10 +107,10 @@ def test_tier_caps_at_four_orders_by_rank_then_discount_and_dedupes_families():
 
 
 def test_underfilled_tier_warns_never_pads():
-    pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True), mk(1, "One", 3, date(2026, 9, 1))]
+    pool = [mk(10, "Now", 40, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 40, date(2026, 10, 13), preorder=True), mk(1, "One", 8, date(2026, 9, 1))]
     w = select.select_week(pool, set(), set(), TODAY)
-    assert [g.id for g in w.tiers["5"]] == [1]
-    assert "Bloco 'até 5 €': só 1 de 4 candidatos disponíveis." in w.warnings and w.tiers["20"] == []
+    assert [g.id for g in w.tiers["10"]] == [1]
+    assert "Bloco 'até 10 €': só 1 de 4 candidatos disponíveis." in w.warnings and w.tiers["20"] == []
 
 
 def test_featured_and_preorder_excluded_from_tiers():

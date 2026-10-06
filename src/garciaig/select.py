@@ -6,7 +6,7 @@ from typing import Iterable
 
 from .models import Game, Week
 
-TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0), ("5", 2.0, 5.0))
+TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0))
 PER_TIER = 4
 TRENDING_COUNT = 4
 DISCOUNT_COUNT = 4

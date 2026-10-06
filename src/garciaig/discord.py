@@ -56,7 +56,7 @@ def build_payload(week: Week, site_url: str = "") -> dict:
             "description": "\n".join(f"• {_line(g, True)}" for g in week.discounts),
             "color": 0xF59E0B,
         })
-    for key in ("20", "10", "5"):
+    for key in ("20", "10"):
         games = week.tiers.get(key) or []
         if games:
             embeds.append({

@@ -12,7 +12,7 @@ from .fmt import fmt_date, fmt_price
 from .models import Game, Week
 
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates"
-TIER_TITLES = {"20": "Até 20 €", "10": "Até 10 €", "5": "Até 5 €"}
+TIER_TITLES = {"20": "Até 20 €", "10": "Até 10 €"}
 
 
 NO_PRICE = "Ver preço na Instant Gaming"
@@ -53,7 +53,7 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
         preorder=_card(week.preorder) if week.preorder else None,
         featured_notes=_notes(week, "destaque"),
         preorder_notes=_notes(week, "pré-venda"),
-        tiers=[(TIER_TITLES[k], [_card(g) for g in week.tiers[k]]) for k in ("20", "10", "5")],
+        tiers=[(TIER_TITLES[k], [_card(g) for g in week.tiers[k]]) for k in ("20", "10")],
     )
     links = re.findall(r'href="(https://www\.instant-gaming\.com[^"]*)"', html)
     affiliate.assert_all_affiliate(links)
