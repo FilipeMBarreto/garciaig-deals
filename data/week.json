@@ -15,25 +15,80 @@
     "is_pc": true,
     "updated_at": 1791279165,
     "rank": 0,
+    "store": "Steam",
     "release_date": "2026-10-06",
     "url": "https://www.instant-gaming.com/pt/21378-comprar-star-wars-galactic-racer-pc-steam/?igr=garciap"
   },
-  "preorder": {
-    "id": 21064,
-    "name": "Planet Zoo 2",
-    "seo_name": "planet-zoo-2-pc-steam",
-    "price": 38.49,
-    "retail": 55.93,
-    "discount": 14,
-    "avail_date": 1791849600,
-    "preorder": true,
-    "is_dlc": false,
-    "is_pc": true,
-    "updated_at": 1790580321,
-    "rank": 50,
-    "release_date": "2026-10-13",
-    "url": "https://www.instant-gaming.com/pt/21064-comprar-planet-zoo-2-pc-steam/?igr=garciap"
-  },
+  "upcoming": [
+    {
+      "id": 21064,
+      "name": "Planet Zoo 2",
+      "seo_name": "planet-zoo-2-pc-steam",
+      "price": 38.49,
+      "retail": 55.93,
+      "discount": 14,
+      "avail_date": 1791849600,
+      "preorder": true,
+      "is_dlc": false,
+      "is_pc": true,
+      "updated_at": 1790580321,
+      "rank": 50,
+      "store": "Steam",
+      "release_date": "2026-10-13",
+      "url": "https://www.instant-gaming.com/pt/21064-comprar-planet-zoo-2-pc-steam/?igr=garciap"
+    },
+    {
+      "id": 21801,
+      "name": "Castlevania: Belmont's Curse",
+      "seo_name": "castlevania-belmont-s-curse-pc-steam",
+      "price": 21.49,
+      "retail": 33.55,
+      "discount": 20,
+      "avail_date": 1792022400,
+      "preorder": true,
+      "is_dlc": false,
+      "is_pc": true,
+      "updated_at": 1783411832,
+      "rank": 29,
+      "store": "Steam",
+      "release_date": "2026-10-15",
+      "url": "https://www.instant-gaming.com/pt/21801-comprar-castlevania-belmont-s-curse-pc-steam/?igr=garciap"
+    },
+    {
+      "id": 22936,
+      "name": "Final Fantasy Resonance",
+      "seo_name": "final-fantasy-resonance-pc-steam",
+      "price": 39.99,
+      "retail": 55.93,
+      "discount": 10,
+      "avail_date": 1792627200,
+      "preorder": true,
+      "is_dlc": false,
+      "is_pc": true,
+      "updated_at": 1790608394,
+      "rank": 38,
+      "store": "Steam",
+      "release_date": "2026-10-22",
+      "url": "https://www.instant-gaming.com/pt/22936-comprar-final-fantasy-resonance-pc-steam/?igr=garciap"
+    },
+    {
+      "id": 14205,
+      "name": "Phantom Blade Zero",
+      "seo_name": "phantom-blade-zero-pc-steam",
+      "price": 45.49,
+      "retail": 67.12,
+      "discount": 15,
+      "avail_date": 1793232000,
+      "preorder": true,
+      "is_dlc": false,
+      "is_pc": true,
+      "updated_at": 1786530128,
+      "rank": 36,
+      "store": "Steam",
+      "release_date": "2026-10-29",
+      "url": "https://www.instant-gaming.com/pt/14205-comprar-phantom-blade-zero-pc-steam/?igr=garciap"
+    }
+  ],
   "tiers": {
     "20": [
       {
@@ -49,6 +104,7 @@
         "is_pc": true,
         "updated_at": 1790147069,
         "rank": 11,
+        "store": "Steam",
         "release_date": "2026-09-22",
         "url": "https://www.instant-gaming.com/pt/22343-comprar-graveyard-keeper-2-pc-steam/?igr=garciap"
       },
@@ -65,6 +121,7 @@
         "is_pc": true,
         "updated_at": 1787643061,
         "rank": 23,
+        "store": "Steam",
         "release_date": "2026-08-11",
         "url": "https://www.instant-gaming.com/pt/12335-comprar-no-more-room-in-hell-2-pc-steam/?igr=garciap"
       },
@@ -81,6 +138,7 @@
         "is_pc": true,
         "updated_at": 1788880131,
         "rank": 24,
+        "store": "Steam",
         "release_date": "2026-08-06",
         "url": "https://www.instant-gaming.com/pt/23124-comprar-restory-chill-electronics-repairs-pc-steam/?igr=garciap"
       },
@@ -97,6 +155,7 @@
         "is_pc": true,
         "updated_at": 1778504197,
         "rank": 27,
+        "store": "Steam",
         "release_date": "2026-04-28",
         "url": "https://www.instant-gaming.com/pt/20985-comprar-far-far-west-pc-steam/?igr=garciap"
       }
@@ -115,6 +174,7 @@
         "is_pc": true,
         "updated_at": 1789026631,
         "rank": 16,
+        "store": "Steam",
         "release_date": "2026-09-08",
         "url": "https://www.instant-gaming.com/pt/20070-comprar-wanderburg-pc-steam/?igr=garciap"
       },
@@ -131,6 +191,7 @@
         "is_pc": true,
         "updated_at": 1787148921,
         "rank": 58,
+        "store": "Steam",
         "release_date": "2026-07-22",
         "url": "https://www.instant-gaming.com/pt/22643-comprar-shift-at-midnight-pc-steam/?igr=garciap"
       },
@@ -147,6 +208,7 @@
         "is_pc": true,
         "updated_at": 1780298708,
         "rank": 10000,
+        "store": "Steam",
         "release_date": "2026-09-29",
         "url": "https://www.instant-gaming.com/pt/21540-comprar-gamer-stop-simulator-pc-steam/?igr=garciap"
       },
@@ -163,48 +225,13 @@
         "is_pc": true,
         "updated_at": 1790264581,
         "rank": 10000,
+        "store": "Steam",
         "release_date": "2026-09-22",
         "url": "https://www.instant-gaming.com/pt/24134-comprar-galbatein-moheomga-gildeu-samuso-pc-steam/?igr=garciap"
       }
-    ],
-    "5": [
-      {
-        "id": 21235,
-        "name": "Cloudscrapers",
-        "seo_name": "cloudscrapers-pc-steam",
-        "price": 4.89,
-        "retail": 7.99,
-        "discount": 32,
-        "avail_date": 1789344000,
-        "preorder": false,
-        "is_dlc": false,
-        "is_pc": true,
-        "updated_at": 1789401685,
-        "rank": 10000,
-        "release_date": "2026-09-14",
-        "url": "https://www.instant-gaming.com/pt/21235-comprar-cloudscrapers-pc-steam/?igr=garciap"
-      },
-      {
-        "id": 23895,
-        "name": "Super Glitch Dash",
-        "seo_name": "super-glitch-dash-pc-steam",
-        "price": 3.79,
-        "retail": 4.99,
-        "discount": 15,
-        "avail_date": 1788912000,
-        "preorder": false,
-        "is_dlc": false,
-        "is_pc": true,
-        "updated_at": 1788973495,
-        "rank": 10000,
-        "release_date": "2026-09-09",
-        "url": "https://www.instant-gaming.com/pt/23895-comprar-super-glitch-dash-pc-steam/?igr=garciap"
-      }
     ]
   },
-  "warnings": [
-    "Bloco 'até 5 €': só 2 de 4 candidatos disponíveis."
-  ],
+  "warnings": [],
   "streamer": {
     "id": 16809,
     "name": "Call of Duty: Modern Warfare 4",
@@ -218,6 +245,7 @@
     "is_pc": true,
     "updated_at": 1790344291,
     "rank": 0,
+    "store": "Microsoft Store",
     "release_date": null,
     "url": "https://www.instant-gaming.com/pt/16809-comprar-call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store/?igr=garciap"
   },
@@ -236,6 +264,7 @@
       "is_pc": true,
       "updated_at": 1790312899,
       "rank": 1,
+      "store": "EA App",
       "release_date": "2026-09-25",
       "url": "https://www.instant-gaming.com/pt/21656-comprar-ea-sports-fc-27-pc-ea-app/?igr=garciap"
     },
@@ -252,6 +281,7 @@
       "is_pc": true,
       "updated_at": 1791277830,
       "rank": 3,
+      "store": "Microsoft Store",
       "release_date": "2026-10-06",
       "url": "https://www.instant-gaming.com/pt/9572-comprar-gears-of-war-e-day-pc-xbox-series-x-s-microsoft-store/?igr=garciap"
     },
@@ -268,6 +298,7 @@
       "is_pc": true,
       "updated_at": 1790781258,
       "rank": 5,
+      "store": "Steam",
       "release_date": "2026-09-29",
       "url": "https://www.instant-gaming.com/pt/19382-comprar-transport-fever-3-pc-mac-steam/?igr=garciap"
     },
@@ -284,6 +315,7 @@
       "is_pc": true,
       "updated_at": 1790781939,
       "rank": 7,
+      "store": "Steam",
       "release_date": "2026-09-29",
       "url": "https://www.instant-gaming.com/pt/13792-comprar-nivalis-nights-pc-steam/?igr=garciap"
     }
@@ -302,6 +334,7 @@
       "is_pc": true,
       "updated_at": 1785845770,
       "rank": 56,
+      "store": "Steam",
       "release_date": "2026-08-04",
       "url": "https://www.instant-gaming.com/pt/19519-comprar-beast-of-reincarnation-pc-steam/?igr=garciap"
     },
@@ -318,6 +351,7 @@
       "is_pc": true,
       "updated_at": 1784539262,
       "rank": 57,
+      "store": "Steam",
       "release_date": "2026-06-18",
       "url": "https://www.instant-gaming.com/pt/22974-comprar-dave-the-diver-collection-pc-steam/?igr=garciap"
     },
@@ -334,6 +368,7 @@
       "is_pc": true,
       "updated_at": 1723800568,
       "rank": 10000,
+      "store": "Steam",
       "release_date": "2026-09-10",
       "url": "https://www.instant-gaming.com/pt/17239-comprar-the-crust-pc-jogo-steam/?igr=garciap"
     },
@@ -350,6 +385,7 @@
       "is_pc": true,
       "updated_at": 1744294357,
       "rank": 10000,
+      "store": "Steam",
       "release_date": "2026-09-09",
       "url": "https://www.instant-gaming.com/pt/19131-comprar-asgard-s-fall-viking-survivors-pc-jogo-steam/?igr=garciap"
     }
