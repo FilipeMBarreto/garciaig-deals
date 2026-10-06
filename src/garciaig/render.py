@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 from datetime import date
@@ -13,6 +14,11 @@ from .models import Game, Week
 
 TEMPLATES = Path(__file__).resolve().parents[2] / "templates"
 TIER_TITLES = {"20": "Até 20 €", "10": "Até 10 €"}
+
+
+def css_version(path: Path = TEMPLATES / "style.css") -> str:
+    """Hash curto do CSS: muda o URL quando o CSS muda (o Pages guarda ficheiros 10 minutos em cache)."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:10]
 
 
 NO_PRICE = "Ver preço na Instant Gaming"
@@ -43,6 +49,7 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=select_autoescape(["html", "j2"]))
     html = env.get_template("index.html.j2").render(
+        css_version=css_version(),
         week_label=week.key,
         period=f"{fmt_date(week.start)} a {fmt_date(week.end)}",
         updated=fmt_date(today),

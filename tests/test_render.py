@@ -241,3 +241,19 @@ def test_stylesheet_has_sr_only_and_shared_tag_rules():
     css = (render.TEMPLATES / "style.css").read_text(encoding="utf-8")
     assert ".sr-only{" in css and "clip" in css and ".tag-big{" in css and ".tag-featured{" in css and ".tag-streamer{" in css
     assert "badge-streamer" not in css
+
+
+def test_stylesheet_url_is_versioned_with_content_hash(tmp_path):
+    import hashlib
+    html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    expected = hashlib.sha256((render.TEMPLATES / "style.css").read_bytes()).hexdigest()[:10]
+    assert f'<link rel="stylesheet" href="style.css?v={expected}">' in html
+    assert (tmp_path / "style.css").exists()
+
+
+def test_css_version_changes_with_content(tmp_path):
+    a, b = tmp_path / "a.css", tmp_path / "b.css"
+    a.write_bytes(b"body{color:red}")
+    b.write_bytes(b"body{color:blue}")
+    va, vb = render.css_version(a), render.css_version(b)
+    assert len(va) == len(vb) == 10 and va != vb and va == render.css_version(a)
