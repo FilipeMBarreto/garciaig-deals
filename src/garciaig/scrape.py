@@ -68,6 +68,7 @@ def _to_game(item: dict, rank: int) -> Game:
         is_pc="1" in _platform_ids(item.get("platforms")),
         updated_at=int(item.get("updated_at") or 0),
         rank=rank,
+        store=str(item.get("type") or "").strip(),
     )
 
 

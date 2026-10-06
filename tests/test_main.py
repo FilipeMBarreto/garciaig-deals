@@ -150,7 +150,7 @@ def test_republish_updates_only_streamer(tmp_path, monkeypatch):
                          fetch_pick=lambda url: pick_page("Outro Jogo"))
     assert out.streamer.name == "Outro Jogo" and out.streamer_note == "novo comentário"
     assert (data / "history.json").read_bytes() == hist_before
-    assert out.featured == first.featured and out.preorder == first.preorder and out.tiers == first.tiers
+    assert out.featured == first.featured and out.upcoming == first.upcoming and out.tiers == first.tiers
     after = json.loads(read(tmp_path, "data/week.json"))
     assert {k: v for k, v in after.items() if k not in ("streamer", "streamer_note")} == \
            {k: v for k, v in week_before.items() if k not in ("streamer", "streamer_note")}
@@ -240,7 +240,7 @@ def test_end_to_end_trending_block(tmp_path):
     assert len(week.trending) == 4
     assert len({select.family(g.name) for g in week.trending}) == 4
     assert all(g.rank < scrape.UNRANKED for g in week.trending)
-    assert not {g.id for g in week.trending} & {week.featured.id, week.preorder.id}
+    assert not {g.id for g in week.trending} & ({week.featured.id} | {g.id for g in week.upcoming})
     assert not {g.id for g in week.trending} & {g.id for games in week.tiers.values() for g in games}
     saved = json.loads(read(tmp_path, "data/week.json"))
     assert [g["id"] for g in saved["trending"]] == [g.id for g in week.trending]
@@ -248,7 +248,7 @@ def test_end_to_end_trending_block(tmp_path):
     hist = json.loads(read(tmp_path, "data/history.json"))
     assert not {g.id for g in week.trending} & {i for ids in hist["weeks"][0]["tiers"].values() for i in ids}
     html = read(tmp_path, "site/index.html")
-    assert html.index("Pré-venda") < html.index("Tendências") < html.index("Até 20 €")
+    assert html.index("Próximos Lançamentos") < html.index("Tendências") < html.index("Até 20 €")
 
 
 def test_streamer_pick_is_excluded_from_trending_and_tiers(tmp_path):
@@ -316,7 +316,7 @@ def test_end_to_end_discounts_block(tmp_path):
     week = run_pick(tmp_path)
     assert week.discounts and len(week.discounts) <= 4
     assert all(g.discount >= 20 and g.retail > g.price for g in week.discounts)
-    page_ids = ([week.featured.id, week.preorder.id] + [g.id for g in week.trending] + [g.id for g in week.discounts]
+    page_ids = ([week.featured.id] + [g.id for g in week.upcoming] + [g.id for g in week.trending] + [g.id for g in week.discounts]
                 + [g.id for games in week.tiers.values() for g in games])
     assert len(page_ids) == len(set(page_ids))
     saved = json.loads(read(tmp_path, "data/week.json"))
@@ -374,3 +374,90 @@ def test_week_json_with_legacy_tier_5_loads_and_republishes_with_two_tiers(tmp_p
     html = read(tmp_path, "site/index.html")
     assert "Até 5" not in html and "Até 20 €" in html and "Até 10 €" in html
     assert "até 5" not in read(tmp_path, "data/discord_payload.json").lower()
+
+
+# ---------- Próximos lançamentos + loja ----------
+
+def test_end_to_end_upcoming_block_and_store(tmp_path):
+    (tmp_path / "data").mkdir()
+    week = run_pick(tmp_path)
+    assert len(week.upcoming) == 4
+    assert all(g.preorder and g.price > 0 and g.release_date >= TODAY for g in week.upcoming)
+    keys = [(g.release_date, g.rank, g.id) for g in week.upcoming]
+    assert keys == sorted(keys)
+    page = [week.featured] + week.upcoming + week.trending + week.discounts + [g for games in week.tiers.values() for g in games]
+    assert len({g.id for g in page}) == len(page)
+    assert len({select.family(g.name) for g in page}) == len(page)
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert [g["id"] for g in saved["upcoming"]] == [g.id for g in week.upcoming] and "preorder" not in saved
+    assert main._week_from_dict(saved) == week
+    assert any(g.store for g in page)
+    hist = json.loads(read(tmp_path, "data/history.json"))
+    assert hist["weeks"][0]["upcoming"] == [g.id for g in week.upcoming]
+    html = read(tmp_path, "site/index.html")
+    assert 'class="store"' in html
+    assert html.index("Destaque da Semana") < html.index("Próximos Lançamentos") < html.index("Tendências")
+
+
+def test_empty_upcoming_warns_and_still_publishes(tmp_path, monkeypatch):
+    (tmp_path / "data").mkdir()
+    h = scrape.load_offline(FIX)
+    full = scrape.build_pool(h["trend"], h["pre"], h["upcoming"])
+    fid = select.select_week(full, set(), set(), TODAY).featured.id
+    monkeypatch.setattr(scrape, "build_pool", lambda *a: [g for g in full if not g.preorder or g.id == fid])
+    week = run_pick(tmp_path)
+    assert week.featured.id == fid and week.upcoming == []
+    assert "Sem próximos lançamentos em pré-venda." in week.warnings
+    assert (tmp_path / "data" / "history.json").exists()
+    assert "Sem próximos lançamentos em pré-venda." in read(tmp_path, "site/index.html")
+
+
+def test_no_featured_still_aborts(tmp_path):
+    (tmp_path / "data").mkdir()
+    with pytest.raises(main.PipelineError):
+        run(tmp_path, today=date(2031, 1, 6))
+
+
+def test_legacy_week_json_with_preorder_raises_and_cli_falls_back(tmp_path, capsys):
+    assert main.cli(cli_args(tmp_path)) == 0
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    saved["preorder"] = saved["featured"]
+    del saved["upcoming"]
+    (tmp_path / "data" / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(main.NoSavedWeek):
+        main.republish(TODAY, data_dir=tmp_path / "data", out_dir=tmp_path / "site", site_url="")
+    capsys.readouterr()
+    assert main.cli(cli_args(tmp_path, "--republish")) == 0
+    out = capsys.readouterr().out
+    assert "Sem semana guardada para esta semana; a fazer execução completa." in out
+    assert "próximos lançamentos: 4 jogos" in out
+
+
+def test_cli_prints_upcoming_names_with_store(tmp_path, capsys):
+    assert main.cli(cli_args(tmp_path, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    assert "pré-venda=" not in out and "próximos lançamentos: 4 jogos" in out
+
+
+def test_republish_new_streamer_dropped_from_upcoming(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    first = run_pick(tmp_path)
+    v = first.upcoming[0]
+    no_fetch_all(monkeypatch)
+    streamer.save_pick(data / "streamer_pick.json", f"https://www.instant-gaming.com/pt/{v.id}-comprar-{v.seo_name}/")
+    page_html = (f'<meta property="og:title" content="Comprar {v.name} - PC (Steam) - Europe">'
+                 f'<script>window.productModel = {{"prod_id": {v.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": true}};</script>')
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=lambda url: page_html)
+    assert v.id not in {g.id for g in out.upcoming} and len(out.upcoming) == 3
+    assert out.streamer.store == "Steam"
+
+
+def test_week_from_dict_tolerates_games_without_store(tmp_path):
+    (tmp_path / "data").mkdir()
+    week = run_pick(tmp_path)
+    d = main._week_dict(week)
+    for g in [d["featured"], *d["upcoming"], *d["trending"]]:
+        g.pop("store", None)
+    back = main._week_from_dict(d)
+    assert back.featured.store == "" and back.upcoming[0].store == ""

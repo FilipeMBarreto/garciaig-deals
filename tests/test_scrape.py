@@ -15,13 +15,14 @@ def test_parse_search_results_normalises_item_and_rank():
     html = (
         'window.searchResults = {"hits":[{"prod_id":1,"name":"A","seo_name":"a-pc-steam",'
         '"price":"39.99","retail":"59.99","discount":33,"avail_date":1791244800,"preorder":1,'
-        '"is_dlc":0,"platforms":["1"],"updated_at":7},'
+        '"is_dlc":0,"platforms":["1"],"updated_at":7,"type":" Steam "},'
         '{"prod_id":2,"name":"B","seo_name":"b","price":"5.00","retail":"5.00","avail_date":null,'
         '"preorder":0,"is_dlc":1,"platforms":"1,2"}]};'
     )
     a, b = scrape.parse_search_results(html)
     assert (a.id, a.price, a.retail, a.discount, a.preorder, a.is_pc, a.rank) == (1, 39.99, 59.99, 33, True, True, 0)
     assert a.release_date.isoformat() == "2026-10-06"
+    assert (a.store, b.store) == ("Steam", "")
     assert (b.is_dlc, b.is_pc, b.avail_date, b.discount, b.rank) == (True, True, None, 0, 1)
     unranked = scrape.parse_search_results(html, ranked=False)
     assert all(g.rank == 10_000 for g in unranked)

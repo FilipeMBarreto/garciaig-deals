@@ -40,7 +40,7 @@ Semana ISO (segunda a domingo) da data de execução; o workflow corre à segund
 | Bloco | Regra | Pausa 4 sem. |
 |---|---|---|
 | Destaque da semana | jogo de PC (não DLC) com lançamento na semana corrente; se não houver, o lançado na semana anterior. Prioridade a jogo que já foi pré-venda destacada; depois edição base, popularidade e PVP | Isento |
-| Pré-venda (semana seguinte) | jogo com lançamento na semana ISO seguinte, o mais próximo; se não houver, a pré-venda mais próxima depois (com aviso) | Isento |
+| Próximos Lançamentos | até 4 jogos de PC (não DLC) em pré-venda, preço > 0, lançamento ≥ hoje; sem o destaque nem o jogo do streamer (id e família). Relevância: melhor posição da família em `/tendencias/`, depois PVP, data, id; uma edição por família (base primeiro). Janela de 30 dias; se faltarem, completa com as pré-vendas mais próximas depois da janela; nunca enche além do que existe. Apresentação por data de lançamento. Cada cartão mostra a loja (campo `type` das listas; no jogo do streamer, a loja do `og:title`) | Isento |
 | Destaque do streamer | escolha manual (`data/streamer_pick.json`, link da Instant Gaming + comentário); só aparece se existir; página lida 1 vez na geração; falha → sem bloco e com aviso | Isento |
 | Tendências | os 4 primeiros de `/tendencias/` (jogo de PC, não DLC, preço > 0; pré-vendas permitidas), uma edição por família; sem pausa de 4 semanas e não entram no histórico. Exclui destaque, pré-venda e o destaque do streamer (por id e família); os escalões de preço excluem também estes jogos | Isento |
 | Maiores Descontos | 4 jogos de PC (não DLC) já lançados, preço > 0 e desconto ≥ 20 %; ordenados por desconto, depois poupança absoluta; uma edição por família. Pausa de 4 semanas (ids guardados em `discounts` no histórico). Não repete jogos de destaque, pré-venda, streamer ou tendências (id e família); os escalões de preço excluem também estes jogos | Sim |
@@ -53,13 +53,13 @@ Escalões exclusivos (jogos até 5 € e gratuitos não entram em nenhum); sem D
 `affiliate.py` é o único sítio que produz URLs publicadas: `https://www.instant-gaming.com/pt/{id}-comprar-{seo_name}/?igr=garciap`. Testes e verificação em runtime falham se um link publicado (site ou Discord) não terminar assim.
 
 ## Histórico
-`data/history.json`: `{"weeks":[{"week","featured","preorder","tiers":{"20":[ids],...}}]}`. Pausa = ids dos blocos de preço das últimas 4 semanas anteriores à atual. Repetir a execução na mesma semana é idempotente (substitui a entrada). Entradas antigas podem ter a chave de escalão `"2"`; continuam a ser lidas e contam para a pausa.
+`data/history.json`: `{"weeks":[{"week","featured","upcoming","discounts","tiers":{"20":[ids],...}}]}`. Pausa = ids dos blocos de preço das últimas 4 semanas anteriores à atual. Repetir a execução na mesma semana é idempotente (substitui a entrada). Entradas antigas podem ter a chave `"preorder"` (conta como destaque-pré-venda anterior) e as chaves de escalão `"5"`/`"2"`; continuam a ser lidas e contam para a pausa.
 
 ## Automação
 `weekly.yml`: cron segunda 08:00 UTC + `workflow_dispatch`. Jobs: `build` (gerar, commit de `data/`, artefacto Pages) → `deploy` (Pages) → `notify` (Discord, só se o deploy correu). Webhook em GitHub Secrets (`DISCORD_WEBHOOK_URL`); `SITE_URL` em Variables.
 
 ## Erros
-Falha de rede/parsing, ou ausência de destaque/pré-venda → termina com erro antes de escrever site ou histórico. `--dry-run` não grava histórico. `--offline DIR` usa HTML guardado.
+Falha de rede/parsing, ou ausência de destaque → termina com erro antes de escrever site ou histórico. Um bloco de próximos lançamentos vazio ou incompleto só gera aviso. `--dry-run` não grava histórico. `--offline DIR` usa HTML guardado.
 
 ## Riscos
 - Dependência da estrutura atual das páginas da Instant Gaming (o erro é visível, não silencioso).

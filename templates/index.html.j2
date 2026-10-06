@@ -13,6 +13,7 @@
     <a class="cover" href="{{ g.url }}" target="_blank" rel="sponsored noopener" aria-label="{{ g.name }}">
       <img src="{{ g.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">
       {% if g.discount %}<span class="badge">-{{ g.discount }}%</span>{% endif %}
+      {% if g.store %}<span class="store">{{ g.store }}</span>{% endif %}
     </a>
     <div class="body">
       {% if streamer %}<span class="badge-streamer">Escolha do streamer</span>{% endif %}
@@ -49,9 +50,13 @@
   </section>
 
   <section>
-    <h2>⏳ Pré-venda</h2>
-    {% if preorder %}{{ card(preorder, true) }}{% else %}<p class="empty">Sem pré-venda disponível.</p>{% endif %}
-    {% for n in preorder_notes %}<p class="note">{{ n }}</p>{% endfor %}
+    <h2>⏳ Próximos Lançamentos</h2>
+    {% if upcoming %}
+    <div class="grid">{% for g in upcoming %}{{ card(g) }}{% endfor %}</div>
+    {% else %}
+    <p class="empty">Sem candidatos esta semana.</p>
+    {% endif %}
+    {% for n in upcoming_notes %}<p class="note">{{ n }}</p>{% endfor %}
   </section>
 
   <section>

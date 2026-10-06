@@ -12,7 +12,7 @@ def make_week():
     return Week(
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
         featured=game(1, "Star Wars: Galactic Racer", 39.99, preorder=True),
-        preorder=game(2, "Planet <Zoo> 2", 38.49, release=1791849600, preorder=True),
+        upcoming=[game(2, "Planet <Zoo> 2", 38.49, release=1791849600, preorder=True)],
         tiers={"20": [game(3, "A", 15)], "10": [game(4, "B", 8)]},
         warnings=["Bloco 'até 10 €': só 0 de 4 candidatos disponíveis."],
     )
@@ -47,16 +47,16 @@ def test_render_has_disclosure_and_responsive_meta(tmp_path):
 def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
     w = make_week()
     w.warnings = [
-        "Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.",
+        "Sem próximos lançamentos em pré-venda.",
         "Sem candidato a destaque <esta> semana.",
         "Bloco 'até 10 €': só 0 de 4 candidatos disponíveis.",
     ]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert '<p class="note">Sem pré-venda para a semana seguinte; usada a mais próxima depois dela.</p>' in html
+    assert '<p class="note">Sem próximos lançamentos em pré-venda.</p>' in html
     assert '<p class="note">Sem candidato a destaque &lt;esta&gt; semana.</p>' in html
     assert "<esta>" not in html
     assert "só 0 de 4" not in html
-    assert html.index("Sem candidato a destaque") < html.index("<h2>⏳ Pré-venda</h2>") < html.index("Sem pré-venda para")
+    assert html.index("Sem candidato a destaque") < html.index("<h2>⏳ Próximos Lançamentos</h2>") < html.index("Sem próximos lançamentos em pré-venda.")
 
 
 def test_render_heading_has_no_zero_jogos(tmp_path):
@@ -71,7 +71,7 @@ def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
     w.streamer_note = "Joguem <script>alert(1)</script> & divirtam-se"
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "🎙️ Destaque do Streamer" in html
-    assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Pré-venda")
+    assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Próximos Lançamentos")
     assert "Escolha do streamer" in html and 'class="badge-streamer"' in html
     assert '<blockquote class="note-streamer">Joguem &lt;script&gt;alert(1)&lt;/script&gt; &amp; divirtam-se</blockquote>' in html
     assert "<script>" not in html and "Pick &lt;b&gt;Game&lt;/b&gt;" in html
@@ -112,7 +112,7 @@ def test_trending_section_between_preorder_and_first_tier(tmp_path):
     w.trending = [game(50 + i, f"Hot {i}", 12) for i in range(4)]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "<h2>🔥 Tendências</h2>" in html
-    assert html.index("Pré-venda") < html.index("Tendências") < html.index("Até 20 €")
+    assert html.index("Próximos Lançamentos") < html.index("Tendências") < html.index("Até 20 €")
     assert "https://www.instant-gaming.com/pt/50-comprar-slug-50/?igr=garciap" in html
 
 
@@ -165,10 +165,49 @@ def test_no_count_text_in_site_headings_or_discord_titles(tmp_path):
     w.streamer = game(7, "Pick", 12)
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     heads = re.findall(r"<h2>(.*?)</h2>", html)
-    assert heads == ["🎙️ Destaque do Streamer", "⭐ Destaque da Semana", "⏳ Pré-venda", "🔥 Tendências",
+    assert heads == ["🎙️ Destaque do Streamer", "⭐ Destaque da Semana", "⏳ Próximos Lançamentos", "🔥 Tendências",
                      "🏷️ Maiores Descontos", "Até 20 €", "Até 10 €"]
     assert not any("jogo" in h.lower() for h in heads)
     titles = [e["title"] for e in discord.build_payload(w)["embeds"]]
-    assert titles == ["🎙️ Destaque do streamer", "⭐ Destaque da Semana", "⏳ Pré-venda", "🔥 Tendências",
+    assert titles == ["🎙️ Destaque do streamer", "⭐ Destaque da Semana", "⏳ Próximos lançamentos", "🔥 Tendências",
                       "🏷️ Maiores Descontos", "💶 Até 20 €", "💶 Até 10 €"]
     assert not any("jogo" in t.lower() for t in titles)
+
+
+def test_upcoming_section_grid_cards_meta_and_empty(tmp_path):
+    w = make_week()
+    w.upcoming = [game(70 + i, f"Soon {i}", 20, release=1791849600, preorder=True) for i in range(4)]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    start = html.index("<h2>⏳ Próximos Lançamentos</h2>")
+    section = html[start:html.index("</section>", start)]
+    assert '<div class="grid">' in section and section.count('<article class="card">') == 4 and "card-big" not in section
+    assert "Pré-venda · Lançamento: 13 de outubro" in section
+    assert html.index("Destaque da Semana") < start < html.index("Tendências")
+    w.upcoming = []
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    start = html.index("<h2>⏳ Próximos Lançamentos</h2>")
+    assert "Sem candidatos esta semana." in html[start:html.index("</section>", start)]
+
+
+def test_upcoming_notes_routing_shortfall_hidden(tmp_path):
+    w = make_week()
+    w.warnings = ["Bloco 'próximos lançamentos': só 1 de 4 candidatos disponíveis.", "Sem próximos lançamentos em pré-venda.",
+                  "Sem candidato a destaque esta semana."]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "só 1 de 4" not in html
+    up = html.index("<h2>⏳ Próximos Lançamentos</h2>")
+    assert up < html.index("Sem próximos lançamentos em pré-venda.") < html.index("<h2>🔥 Tendências</h2>")
+    assert html.index("Sem candidato a destaque") < up
+
+
+def test_store_pill_on_cover_only_when_store_set(tmp_path):
+    import dataclasses
+    w = make_week()
+    w.tiers["20"] = [dataclasses.replace(game(3, "A", 15), store="Steam <x>")]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert html.count('<span class="store">') == 1 and '<span class="store">Steam &lt;x&gt;</span>' in html
+    at = html.index('class="store"')
+    assert "</a>" not in html[html.rindex('<a class="cover"', 0, at):at]  # a pílula está dentro da capa
+    w.featured = dataclasses.replace(w.featured, store="Epic Games")
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert html.count('<span class="store">') == 2 and '<span class="store">Epic Games</span>' in html

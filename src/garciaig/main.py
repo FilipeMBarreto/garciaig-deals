@@ -36,7 +36,7 @@ def _week_dict(w: Week) -> dict:
         "start": w.start.isoformat(),
         "end": w.end.isoformat(),
         "featured": _game_dict(w.featured),
-        "preorder": _game_dict(w.preorder),
+        "upcoming": [_game_dict(g) for g in w.upcoming],
         "tiers": {k: [_game_dict(g) for g in games] for k, games in w.tiers.items()},
         "warnings": w.warnings,
         "streamer": _game_dict(w.streamer),
@@ -58,7 +58,7 @@ def _week_from_dict(d: dict) -> Week:
         start=date.fromisoformat(d["start"]),
         end=date.fromisoformat(d["end"]),
         featured=_game_from_dict(d["featured"]),
-        preorder=_game_from_dict(d["preorder"]),
+        upcoming=[_game_from_dict(g) for g in d.get("upcoming", [])],
         tiers={k: [_game_from_dict(g) for g in games] for k, games in d["tiers"].items()},
         warnings=list(d.get("warnings", [])),
         streamer=_game_from_dict(d.get("streamer")),
@@ -91,8 +91,8 @@ def run(today: date, *, offline_dir: Path | None, data_dir: Path, out_dir: Path,
     week.streamer, week.streamer_note = pick, pick_note
     week.warnings.extend(pick_warnings)
 
-    if week.featured is None or week.preorder is None:
-        raise PipelineError("Sem destaque ou sem pré-venda: " + "; ".join(week.warnings))
+    if week.featured is None:
+        raise PipelineError("Sem destaque: " + "; ".join(week.warnings))
 
     _write_outputs(week, today, data_dir, Path(out_dir), site_url)
     if not dry_run:
@@ -113,7 +113,7 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
         saved = json.loads((data_dir / "week.json").read_text(encoding="utf-8"))
         if saved["week"] != select.week_key(today):
             raise NoSavedWeek("A semana guardada é de outra semana.")
-        if "trending" not in saved or "discounts" not in saved:
+        if "trending" not in saved or "discounts" not in saved or "upcoming" not in saved:
             raise NoSavedWeek("A semana guardada é de uma versão antiga (sem tendências).")
         week = _week_from_dict(saved)
     except NoSavedWeek:
@@ -131,6 +131,7 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
         keep = lambda g: g.id not in gone_ids and select.family(g.name) not in gone_fam  # noqa: E731
         week.trending = [g for g in week.trending if keep(g)]
         week.discounts = [g for g in week.discounts if keep(g)]
+        week.upcoming = [g for g in week.upcoming if keep(g)]
         week.tiers = {k: [g for g in games if keep(g)] for k, games in week.tiers.items()}
     _write_outputs(week, today, data_dir, Path(out_dir), site_url)
     return week
@@ -160,7 +161,8 @@ def cli(argv: list[str] | None = None) -> int:
     except (PipelineError, scrape.ScrapeError) as e:
         print(f"ERRO: {e}")
         return 1
-    print(f"Semana {week.key}: destaque={week.featured.name!r}, pré-venda={week.preorder.name!r}")
+    print(f"Semana {week.key}: destaque={week.featured.name!r}")
+    print(f"  próximos lançamentos: {len(week.upcoming)} jogos" + "".join(f"\n    - {g.name} ({g.store or 'loja n/d'}, {g.release_date})" for g in week.upcoming))
     if week.streamer:
         print(f"  destaque do streamer: {week.streamer.name!r}")
     print(f"  tendências: {len(week.trending)} jogos")

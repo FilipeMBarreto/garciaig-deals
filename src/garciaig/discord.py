@@ -9,7 +9,7 @@ from pathlib import Path
 import requests
 
 from . import affiliate
-from .fmt import fmt_price
+from .fmt import fmt_date, fmt_price
 from .models import Game, Week
 from .render import NO_PRICE, TIER_TITLES
 
@@ -18,9 +18,16 @@ def _md(text: str) -> str:
     return re.sub(r"([\[\]\\*_`~|>])", r"\\\1", text)
 
 
-def _line(g: Game, show_discount: bool = False) -> str:
+def _line(g: Game, show_discount: bool = False, show_date: bool = False) -> str:
     price = fmt_price(g.price) if g.price > 0 else NO_PRICE
-    return f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{price}**" + (f" (-{g.discount} %)" if show_discount and g.discount > 0 else "")
+    line = f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{price}**"
+    if show_discount and g.discount > 0:
+        line += f" (-{g.discount} %)"
+    if g.store:
+        line += f" · {_md(g.store)}"
+    if show_date and g.release_date:
+        line += f" · {fmt_date(g.release_date)}"
+    return line
 
 
 def build_payload(week: Week, site_url: str = "") -> dict:
@@ -42,8 +49,12 @@ def build_payload(week: Week, site_url: str = "") -> dict:
             "color": 0x8B5CF6,
             "image": {"url": week.featured.cover_url},
         })
-    if week.preorder:
-        embeds.append({"title": "⏳ Pré-venda", "description": _line(week.preorder), "color": 0x22D3EE})
+    if week.upcoming:
+        embeds.append({
+            "title": "⏳ Próximos lançamentos",
+            "description": "\n".join(f"• {_line(g, show_date=True)}" for g in week.upcoming),
+            "color": 0x22D3EE,
+        })
     if week.trending:
         embeds.append({
             "title": "🔥 Tendências",

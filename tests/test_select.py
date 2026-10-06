@@ -59,22 +59,8 @@ def test_no_featured_candidate_warns():
     assert w.featured is None and any("destaque" in x.lower() for x in w.warnings)
 
 
-def test_preorder_is_closest_next_week_and_not_featured_family():
-    pool = [
-        mk(1, "Now Game", 40, date(2026, 10, 6), preorder=True, rank=0),
-        mk(2, "Planet Zoo 2 Deluxe Edition", 49, date(2026, 10, 13), preorder=True),
-        mk(3, "Planet Zoo 2", 38, date(2026, 10, 13), preorder=True),
-        mk(4, "Castlevania", 21, date(2026, 10, 15), preorder=True),
-    ]
-    w = select.select_week(pool, set(), set(), TODAY)
-    assert w.featured.id == 1
-    assert w.preorder.id == 3  # data mais próxima, edição base
 
 
-def test_preorder_falls_back_to_later_with_warning():
-    pool = [mk(1, "Now", 40, date(2026, 10, 6), preorder=True), mk(2, "Far", 40, date(2026, 11, 20), preorder=True)]
-    w = select.select_week(pool, set(), set(), TODAY)
-    assert w.preorder.id == 2 and any("pré-venda" in x for x in w.warnings)
 
 
 def test_tiers_exclusive_ranges_and_exclusions():
@@ -113,7 +99,7 @@ def test_underfilled_tier_warns_never_pads():
     assert "Bloco 'até 10 €': só 1 de 4 candidatos disponíveis." in w.warnings and w.tiers["20"] == []
 
 
-def test_featured_and_preorder_excluded_from_tiers():
+def test_featured_and_upcoming_excluded_from_tiers():
     pool = [mk(10, "Now", 15, date(2026, 10, 6), preorder=True), mk(11, "Zoo", 15, date(2026, 10, 13), preorder=True)]
     w = select.select_week(pool, set(), set(), TODAY)
     assert w.tiers["20"] == []
@@ -125,41 +111,18 @@ def test_real_snapshot_selection():
     pool = scrape.build_pool(h["trend"], h["pre"], h["upcoming"])
     w = select.select_week(pool, set(), set(), TODAY)
     assert w.featured and date(2026, 10, 5) <= w.featured.release_date <= date(2026, 10, 11)
-    assert w.preorder and date(2026, 10, 12) <= w.preorder.release_date <= date(2026, 10, 18)
-    assert w.preorder.preorder and w.preorder.price > 0
+    assert len(w.upcoming) == 4
+    assert all(g.preorder and g.price > 0 and g.release_date >= TODAY for g in w.upcoming)
     for key, lo, hi in select.TIERS:
         assert all(lo < g.price <= hi and not g.is_dlc and g.is_pc for g in w.tiers[key])
-    ids = [g.id for games in w.tiers.values() for g in games] + [g.id for g in w.trending] + [w.featured.id, w.preorder.id]
+    ids = [g.id for games in w.tiers.values() for g in games] + [g.id for g in w.trending] + [g.id for g in w.upcoming] + [g.id for g in w.discounts] + [w.featured.id]
     assert len(ids) == len(set(ids))
 
 
-def test_preorder_never_picks_free_or_non_preorder_items():
-    pool = [
-        mk(1, "Now", 40, date(2026, 10, 6), preorder=True),
-        mk(2, "Free Thing", 0, date(2026, 10, 12), preorder=True),
-        mk(3, "Monkey Bizniz", 5, date(2026, 10, 13), preorder=False),
-        mk(4, "Real Preorder", 30, date(2026, 10, 16), preorder=True),
-    ]
-    w = select.select_week(pool, set(), set(), TODAY)
-    assert w.preorder.id == 4 and w.preorder.preorder and w.preorder.price > 0
 
 
-def test_preorder_only_invalid_candidates_gives_none_with_warning():
-    pool = [
-        mk(1, "Now", 40, date(2026, 10, 6), preorder=True),
-        mk(2, "Free Thing", 0, date(2026, 10, 12), preorder=True),
-        mk(3, "Monkey Bizniz", 5, date(2026, 10, 13), preorder=False),
-        mk(4, "Free Later", 0, date(2026, 11, 20), preorder=True),
-    ]
-    w = select.select_week(pool, set(), set(), TODAY)
-    assert w.preorder is None and any("pré-venda" in x for x in w.warnings)
 
 
-def test_preorder_later_fallback_requires_price():
-    pool = [mk(1, "Now", 40, date(2026, 10, 6), preorder=True), mk(2, "Free Later", 0, date(2026, 11, 20), preorder=True),
-            mk(3, "Paid Later", 20, date(2026, 12, 1), preorder=True)]
-    w = select.select_week(pool, set(), set(), TODAY)
-    assert w.preorder.id == 3
 
 
 import pytest  # noqa: E402
@@ -258,7 +221,7 @@ def test_real_snapshot_trending():
     assert len(w.trending) == 4
     assert all(g.rank < scrape.UNRANKED for g in w.trending)
     assert len({select.family(g.name) for g in w.trending}) == 4
-    assert not {g.id for g in w.trending} & {w.featured.id, w.preorder.id}
+    assert not {g.id for g in w.trending} & ({w.featured.id} | {g.id for g in w.upcoming})
 
 
 # ---------- Maiores descontos ----------
@@ -335,3 +298,94 @@ def test_tiers_exclude_discount_ids_and_families():
     w = select.select_week(pool, set(), set(), TODAY)
     assert [g.id for g in w.discounts] == [460]
     assert [g.id for g in w.tiers["20"]] == [462]
+
+
+# ---------- Próximos lançamentos ----------
+
+def pre(i, name, release, price=30, *, rank=10_000, retail=None, **kw):
+    return mk(i, name, price, release, preorder=True, rank=rank, retail=retail, **kw)
+
+
+def featured_game():
+    return mk(10, "Now", 40, date(2026, 10, 6), preorder=True)
+
+
+def test_upcoming_relevance_by_family_trend_rank_then_retail():
+    pool = [featured_game(),
+            pre(500, "Cold Rich", date(2026, 10, 20), retail=90),
+            pre(501, "Cold Poor", date(2026, 10, 14), retail=30),
+            pre(502, "Hot Game", date(2026, 10, 30), retail=20),
+            pre(503, "Hot Game Deluxe Edition", date(2026, 10, 30), retail=30),
+            pre(504, "Warm", date(2026, 10, 16), retail=10),
+            pre(505, "Extra", date(2026, 10, 17), retail=5)]
+    pool.append(mk(506, "Hot Game", 20, date(2026, 9, 1), rank=0))  # a família está em /tendencias/
+    pool.append(mk(507, "Warm", 20, date(2026, 9, 1), rank=7))
+    w = select.select_week(pool, set(), set(), TODAY)
+    # relevância: Hot Game (rank 0), Warm (rank 7), depois Cold Rich (retail 90), Cold Poor (30)
+    assert {g.id for g in w.upcoming} == {502, 504, 500, 501}
+    assert select.UPCOMING_COUNT == 4
+    # apresentação por data de lançamento
+    assert [g.id for g in w.upcoming] == [501, 504, 500, 502]
+
+
+def test_upcoming_family_dedupe_prefers_base_edition():
+    pool = [featured_game(), pre(510, "Twin Deluxe Edition", date(2026, 10, 14), retail=99), pre(511, "Twin", date(2026, 10, 14), retail=50)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.upcoming] == [511]
+
+
+def test_upcoming_window_30_days_then_fills_with_later_by_closest_date():
+    pool = [featured_game(), pre(520, "In Window", date(2026, 11, 4), retail=10),
+            pre(521, "Far B", date(2027, 2, 1), retail=900), pre(522, "Far A", date(2026, 12, 1), retail=1),
+            pre(523, "Far C", date(2027, 3, 1)), pre(524, "Far D", date(2027, 4, 1)), pre(525, "Far E", date(2027, 5, 1))]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.upcoming] == [520, 522, 521, 523]  # janela primeiro; depois as mais próximas
+    assert pre(1, "x", date(2026, 11, 5)).release_date > TODAY + select.timedelta(days=30)
+
+
+def test_upcoming_window_beats_relevance_of_later_games():
+    pool = [featured_game()] + [pre(530 + n, f"Near {n}", date(2026, 10, 10 + n), retail=1) for n in range(4)]
+    pool += [pre(540, "Far Star", date(2027, 1, 1), retail=999, rank=0)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert 540 not in {g.id for g in w.upcoming} and len(w.upcoming) == 4
+
+
+def test_upcoming_exclusions():
+    pick = pre(550, "Pick", date(2026, 10, 14))
+    pool = [featured_game(), pick, pre(551, "Pick Deluxe Edition", date(2026, 10, 14)),
+            pre(552, "Now Deluxe Edition", date(2026, 10, 14)),
+            mk(553, "Not preorder", 30, date(2026, 10, 14)),
+            pre(554, "Free", date(2026, 10, 14), price=0),
+            pre(555, "No date", None) if False else mk(555, "No date", 30, None, preorder=True),
+            pre(556, "Dlc", date(2026, 10, 14), dlc=True), pre(557, "Console", date(2026, 10, 14), pc=False),
+            pre(558, "Past", date(2026, 9, 20)),
+            pre(559, "Today", TODAY), pre(560, "Good", date(2026, 10, 15))]
+    w = select.select_week(pool, set(), set(), TODAY, exclude_games=[pick])
+    assert {g.id for g in w.upcoming} == {559, 560}
+
+
+def test_upcoming_not_subject_to_pause():
+    pool = [featured_game(), pre(570, "Again", date(2026, 10, 14))]
+    w = select.select_week(pool, {570}, {570}, TODAY)
+    assert [g.id for g in w.upcoming] == [570]
+
+
+def test_upcoming_warnings():
+    w = select.select_week([featured_game()], set(), set(), TODAY)
+    assert w.upcoming == [] and "Sem próximos lançamentos em pré-venda." in w.warnings
+    assert not any("só 0 de 4" in x and "próximos" in x for x in w.warnings)
+    w = select.select_week([featured_game(), pre(580, "One", date(2026, 10, 14))], set(), set(), TODAY)
+    assert "Bloco 'próximos lançamentos': só 1 de 4 candidatos disponíveis." in w.warnings
+    assert not any("destaque" in x.lower() for x in w.warnings if "próximos" in x)
+
+
+def test_trending_discounts_and_tiers_exclude_upcoming_ids_and_families():
+    pool = [featured_game(),
+            pre(590, "Soon", date(2026, 10, 14), retail=50),
+            mk(591, "Soon", 15, date(2026, 9, 1), rank=0, retail=60, discount=75),          # mesma família, já lançado
+            mk(592, "Soon Deluxe Edition", 15, date(2026, 9, 1), retail=60, discount=75),
+            mk(593, "Other", 15, date(2026, 9, 1))]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.upcoming] == [590]
+    assert w.trending == [] and w.discounts == []
+    assert [g.id for g in w.tiers["20"]] == [593]

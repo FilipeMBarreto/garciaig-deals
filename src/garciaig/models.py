@@ -18,6 +18,7 @@ class Game:
     is_pc: bool
     updated_at: int = 0
     rank: int = 10_000
+    store: str = ""
 
     @property
     def release_date(self) -> date | None:
@@ -36,7 +37,7 @@ class Week:
     start: date
     end: date
     featured: Game | None
-    preorder: Game | None
+    upcoming: list[Game]
     tiers: dict[str, list[Game]]
     warnings: list[str] = field(default_factory=list)
     streamer: Game | None = None

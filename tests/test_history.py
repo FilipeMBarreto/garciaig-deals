@@ -7,8 +7,8 @@ def g(i):
     return Game(i, f"G{i}", f"g{i}", 5.0, 5.0, 0, None, False, False, True)
 
 
-def week(key, featured=None, preorder=None, tiers=None):
-    return Week(key, date(2026, 1, 1), date(2026, 1, 7), featured, preorder, tiers or {"20": [], "10": []})
+def week(key, featured=None, upcoming=None, tiers=None):
+    return Week(key, date(2026, 1, 1), date(2026, 1, 7), featured, upcoming or [], tiers or {"20": [], "10": []})
 
 
 def test_load_missing_file(tmp_path):
@@ -16,11 +16,11 @@ def test_load_missing_file(tmp_path):
 
 
 def test_record_save_load_roundtrip(tmp_path):
-    h = history.record({"weeks": []}, week("2026-W40", g(1), g(2), {"20": [g(3)], "10": []}))
+    h = history.record({"weeks": []}, week("2026-W40", g(1), [g(2)], {"20": [g(3)], "10": []}))
     p = tmp_path / "h.json"
     history.save(p, h)
     assert history.load(p) == h
-    assert h["weeks"][0] == {"week": "2026-W40", "featured": 1, "preorder": 2, "tiers": {"20": [3], "10": []}, "discounts": []}
+    assert h["weeks"][0] == {"week": "2026-W40", "featured": 1, "tiers": {"20": [3], "10": []}, "discounts": [], "upcoming": [2]}
 
 
 def test_record_same_week_is_idempotent():
@@ -40,7 +40,7 @@ def test_recent_ids_window_excludes_current_and_old():
 
 
 def test_featured_and_preorder_do_not_count_for_pause():
-    h = history.record({"weeks": []}, week("2026-W40", g(1), g(2)))
+    h = history.record({"weeks": []}, week("2026-W40", g(1), [g(2)]))
     assert history.recent_ids(h, "2026-W41") == set()
     assert history.preorder_ids(h) == {2}
 
@@ -77,3 +77,14 @@ def test_trending_does_not_count_for_pause_and_legacy_entries_without_discounts_
 def test_legacy_tier_5_ids_still_count_for_pause():
     h = {"weeks": [{"week": "2026-W40", "featured": None, "preorder": None, "tiers": {"20": [3], "10": [], "5": [4]}}]}
     assert history.recent_ids(h, "2026-W41") == {3, 4}
+
+
+def test_preorder_ids_unions_legacy_preorder_and_new_upcoming():
+    h = {"weeks": [
+        {"week": "2026-W38", "featured": 1, "preorder": 7, "tiers": {"20": []}},
+        {"week": "2026-W39", "featured": 1, "preorder": None, "tiers": {"20": []}},
+    ]}
+    h = history.record(h, week("2026-W40", g(1), [g(8), g(9)]))
+    assert history.preorder_ids(h) == {7, 8, 9}
+    assert "preorder" not in h["weeks"][-1]
+    assert history.recent_ids(h, "2026-W41") == set()  # próximos lançamentos não contam para a pausa

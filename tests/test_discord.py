@@ -14,7 +14,7 @@ def game(i, name, price, preorder=False):
 def make_week():
     return Week(
         "2026-W41", date(2026, 10, 5), date(2026, 10, 11),
-        game(1, "Star [Wars]", 39.99, True), game(2, "Zoo", 38.49, True),
+        game(1, "Star [Wars]", 39.99, True), [game(2, "Zoo", 38.49, True)],
         {"20": [game(3, "A", 15)], "10": []},
     )
 
@@ -129,7 +129,7 @@ def test_guard_rejects_unmarked_instant_gaming_url_anywhere():
     with pytest.raises(ValueError):
         discord.build_payload(w)
     w2 = make_week()
-    w2.preorder = game(2, "Zoo (https://www.instant-gaming.com/pt/5-comprar-z/)", 38.49, True)
+    w2.upcoming = [game(2, "Zoo (https://www.instant-gaming.com/pt/5-comprar-z/)", 38.49, True)]
     with pytest.raises(ValueError):
         discord.build_payload(w2)
 
@@ -144,7 +144,7 @@ def test_trending_embed_order_color_and_links():
     w.trending = [game(50 + i, f"Hot [{i}]", 12) for i in range(4)]
     p = discord.build_payload(w)
     titles = [e["title"] for e in p["embeds"]]
-    assert titles.index("🔥 Tendências") == titles.index("⏳ Pré-venda") + 1
+    assert titles.index("🔥 Tendências") == titles.index("⏳ Próximos lançamentos") + 1
     assert titles.index("🔥 Tendências") < next(i for i, t in enumerate(titles) if "até 20" in t.lower())
     e = p["embeds"][titles.index("🔥 Tendências")]
     assert e["color"] == 0xEF4444 and e["description"].count("• [") == 4 and "Hot \\[0\\]" in e["description"]
@@ -180,3 +180,28 @@ def test_payload_has_no_tier_5_even_for_legacy_weeks():
     w.tiers["5"] = [game(99, "Legacy Cheap", 3)]
     text = json.dumps(discord.build_payload(w), ensure_ascii=False)
     assert "Legacy Cheap" not in text and "até 5" not in text.lower()
+
+
+def test_upcoming_embed_lines_have_store_and_date_in_display_order():
+    import dataclasses
+    w = make_week()
+    w.upcoming = [dataclasses.replace(game(80 + i, f"Soon [{i}]", 39.99, True), store=s)
+                  for i, s in enumerate(["Steam", "Microsoft Store", ""])]
+    p = discord.build_payload(w)
+    titles = [e["title"] for e in p["embeds"]]
+    assert titles.index("⏳ Próximos lançamentos") == titles.index("⭐ Destaque da Semana") + 1
+    d = p["embeds"][titles.index("⏳ Próximos lançamentos")]["description"].split("\n")
+    assert d[0].startswith("• [Soon \\[0\\]](https://www.instant-gaming.com/pt/80-comprar-slug-80/?igr=garciap) — **39,99 €** · Steam · 6 de outubro")
+    assert "· Microsoft Store · 6 de outubro" in d[1]
+    assert d[2].endswith("**39,99 €** · 6 de outubro")
+    assert all(l.endswith("?igr=garciap") for l in re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", json.dumps(p, ensure_ascii=False)))
+
+
+def test_upcoming_embed_omitted_when_empty_and_store_in_other_lines():
+    import dataclasses
+    w = make_week()
+    w.upcoming = []
+    w.featured = dataclasses.replace(w.featured, store="Steam")
+    p = discord.build_payload(w)
+    assert not any("Próximos" in e["title"] for e in p["embeds"])
+    assert p["embeds"][0]["description"].endswith("**39,99 €** · Steam")

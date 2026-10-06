@@ -25,16 +25,18 @@ def recent_ids(hist: dict, week_key: str, weeks: int = 4) -> set[int]:
 
 
 def preorder_ids(hist: dict) -> set[int]:
-    return {w["preorder"] for w in hist["weeks"] if w.get("preorder") is not None}
+    """Ids já destacados como pré-venda: campo antigo `preorder` e lista nova `upcoming`."""
+    ids = {w["preorder"] for w in hist["weeks"] if w.get("preorder") is not None}
+    return ids | {i for w in hist["weeks"] for i in w.get("upcoming", [])}
 
 
 def record(hist: dict, week: Week) -> dict:
     entry = {
         "week": week.key,
         "featured": week.featured.id if week.featured else None,
-        "preorder": week.preorder.id if week.preorder else None,
         "tiers": {k: [g.id for g in games] for k, games in week.tiers.items()},
         "discounts": [g.id for g in week.discounts],
+        "upcoming": [g.id for g in week.upcoming],
     }
     others = [w for w in hist["weeks"] if w["week"] != week.key]
     return {"weeks": sorted(others + [entry], key=lambda w: w["week"])[-MAX_WEEKS:]}

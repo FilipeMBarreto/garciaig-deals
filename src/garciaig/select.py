@@ -10,6 +10,8 @@ TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0))
 PER_TIER = 4
 TRENDING_COUNT = 4
 DISCOUNT_COUNT = 4
+UPCOMING_COUNT = 4
+UPCOMING_WINDOW_DAYS = 30
 MIN_DISCOUNT = 20
 UNRANKED = 10_000  # igual a scrape.UNRANKED (rank < UNRANKED = veio de /tendencias/)
 
@@ -62,27 +64,35 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
     if featured is None:
         warnings.append("Sem candidato a destaque esta semana.")
 
-    # Pré-venda da semana seguinte
-    next_start, next_end = end + timedelta(days=1), end + timedelta(days=7)
-    featured_family = family(featured.name) if featured else None
-
-    def eligible(g: Game) -> bool:
-        return g.preorder and g.price > 0 and (featured is None or (g.id != featured.id and family(g.name) != featured_family))
-
-    nxt = [g for g in base if next_start <= g.release_date <= next_end and eligible(g)]
-    order = lambda g: (g.release_date, is_edition(g), g.rank, -g.retail, g.id)  # noqa: E731
-    preorder = min(nxt, key=order, default=None)
-    if preorder is None:
-        later = [g for g in base if g.release_date > next_end and eligible(g)]
-        preorder = min(later, key=order, default=None)
-        warnings.append(
-            "Sem pré-venda para a semana seguinte; usada a mais próxima depois dela."
-            if preorder else "Sem nenhuma pré-venda disponível."
-        )
+    # Próximos lançamentos: pré-vendas ainda por lançar, por relevância (família em /tendencias/, depois PVP)
+    excluded = list(exclude_games)
+    skip = [g for g in (featured, *excluded) if g]
+    skip_ids = {g.id for g in skip}
+    skip_families = {family(g.name) for g in skip}
+    best_rank: dict[str, int] = {}
+    for g in pool:
+        fam = family(g.name)
+        best_rank[fam] = min(best_rank.get(fam, g.rank), g.rank)
+    reps: dict[str, Game] = {}
+    for g in base:
+        fam = family(g.name)
+        if not (g.preorder and g.price > 0 and g.release_date >= today and g.id not in skip_ids and fam not in skip_families):
+            continue
+        cur = reps.get(fam)
+        if cur is None or (is_edition(g), g.rank, g.id) < (is_edition(cur), cur.rank, cur.id):
+            reps[fam] = g
+    horizon = today + timedelta(days=UPCOMING_WINDOW_DAYS)
+    near = sorted((g for g in reps.values() if g.release_date <= horizon),
+                  key=lambda g: (best_rank[family(g.name)], -g.retail, g.release_date, g.id))[:UPCOMING_COUNT]
+    later = sorted((g for g in reps.values() if g.release_date > horizon), key=lambda g: (g.release_date, g.id))
+    upcoming = sorted(near + later[:UPCOMING_COUNT - len(near)], key=lambda g: (g.release_date, g.rank, g.id))
+    if not upcoming:
+        warnings.append("Sem próximos lançamentos em pré-venda.")
+    elif len(upcoming) < UPCOMING_COUNT:
+        warnings.append(f"Bloco 'próximos lançamentos': só {len(upcoming)} de {UPCOMING_COUNT} candidatos disponíveis.")
 
     # Tendências: top de /tendencias/ (sem pausa), sem repetir nada que já esteja na página
-    excluded = list(exclude_games)
-    taken = [g for g in (featured, preorder, *excluded) if g]
+    taken = [*skip, *upcoming]
     taken_ids = {g.id for g in taken}
     taken_families = {family(g.name) for g in taken}
     by_family: dict[str, Game] = {}
@@ -145,4 +155,4 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
             warnings.append(f"Bloco 'até {key} €': só {len(picked)} de {PER_TIER} candidatos disponíveis.")
         tiers[key] = picked
 
-    return Week(week_key(today), start, end, featured, preorder, tiers, warnings, trending=trending, discounts=discounts)
+    return Week(week_key(today), start, end, featured, upcoming, tiers, warnings, trending=trending, discounts=discounts)

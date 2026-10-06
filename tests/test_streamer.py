@@ -291,6 +291,15 @@ def test_resolve_cleans_hand_edited_note(tmp_path):
     assert note == "olha isto"
 
 
+STORES = {
+    "Comprar Gears of War: E-Day - PC & XBOX Series X|S (Microsoft Store)": "Microsoft Store",
+    "Comprar Call of Duty: Modern Warfare 4 - PC & XBOX Series X|S (Microsoft Store)": "Microsoft Store",
+    "Comprar Star Wars: Galactic Racer - PC (Steam) - Europe & USA & Canada": "Steam",
+    "Comprar Transport Fever 3 - Deluxe Edition - PC (Steam) - Europe": "Steam",
+    "Comprar Game - Remastered (Edition) - PC (Steam) - Europe": "Steam",
+}
+
+
 @pytest.mark.parametrize("title,expected", [
     ("Comprar Gears of War: E-Day - PC & XBOX Series X|S (Microsoft Store)", "Gears of War: E-Day"),
     ("Comprar Call of Duty: Modern Warfare 4 - PC & XBOX Series X|S (Microsoft Store)", "Call of Duty: Modern Warfare 4"),
@@ -301,3 +310,9 @@ def test_resolve_cleans_hand_edited_note(tmp_path):
 def test_real_og_titles(title, expected):
     g = streamer.parse_product_page(page(title=title), 21378, "slug-fallback-should-not-be-used")
     assert g.name == expected
+    assert g.store == STORES[title]
+
+
+def test_store_empty_when_title_unmatched():
+    assert streamer.parse_product_page(page(title=None), 21378, "x").store == ""
+    assert streamer.parse_product_page(page(title="Qualquer coisa"), 21378, "x").store == ""

@@ -23,7 +23,7 @@ _WARNING = WARNING_PREFIX + ": não foi possível carregar o jogo escolhido; o b
 _HOSTS = {"www.instant-gaming.com", "instant-gaming.com"}
 _PATH_RE = re.compile(r"^/pt/([0-9]+)-comprar-([a-z0-9-]+)/?$", re.ASCII)
 _URL_RE = re.compile(r"https?://\S+|\b(?:www\.)?instant-gaming\.com\S*", re.IGNORECASE)
-_PLATFORM = r"(?:PC|Mac|Linux|Xbox|PlayStation|PS[345]|Nintendo|Switch|Steam)\b[^()]*\([^)]*\)"
+_PLATFORM = r"(?:PC|Mac|Linux|Xbox|PlayStation|PS[345]|Nintendo|Switch|Steam)\b[^()]*\((?P<store>[^)]*)\)"
 _TITLE_RE = re.compile(rf"^Comprar\s+(.*?)\s+-\s+{_PLATFORM}(?:\s+-\s+.*)?$", re.IGNORECASE)
 
 
@@ -91,12 +91,13 @@ def _meta_content(html: str, prop: str) -> str | None:
     return None
 
 
-def _name_from(og_title: str | None, seo_name: str) -> str:
+def _title_parts(og_title: str | None, seo_name: str) -> tuple[str, str]:
+    """(nome, loja) a partir do og:title; sem correspondência: nome do slug e loja vazia."""
     if og_title:
         m = _TITLE_RE.match(og_title.strip())
         if m and m.group(1).strip():
-            return m.group(1).strip()
-    return seo_name.replace("-", " ").title()
+            return m.group(1).strip(), m.group("store").strip()
+    return seo_name.replace("-", " ").title(), ""
 
 
 def parse_product_page(html: str, game_id: int, seo_name: str) -> Game:
@@ -120,9 +121,10 @@ def parse_product_page(html: str, game_id: int, seo_name: str) -> Game:
         raise scrape.ScrapeError("productModel sem preço válido") from e
     image = _meta_content(html, "og:image") or ""
     v = re.search(r"[?&]v=(\d+)", image)
+    name, store = _title_parts(_meta_content(html, "og:title"), seo_name)
     return Game(
         id=game_id,
-        name=_name_from(_meta_content(html, "og:title"), seo_name),
+        name=name,
         seo_name=seo_name,
         price=price,
         retail=retail,
@@ -133,6 +135,7 @@ def parse_product_page(html: str, game_id: int, seo_name: str) -> Game:
         is_pc=True,
         updated_at=int(v.group(1)) if v else 0,
         rank=0,
+        store=store,
     )
 
 

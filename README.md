@@ -14,10 +14,12 @@ python -m http.server 8765 --directory site
 
 ## Como funciona
 1. `scrape`: lê `/tendencias/`, `/pre-reservas/` e `/proximos-lancamentos/` (JSON embebido nas páginas; 3 pedidos, 2,5 s de pausa).
-2. `select`: escolhe destaque, pré-venda, "Tendências" (os 4 primeiros de `/tendencias/`, sem pausa e sem repetir nada da página), "Maiores Descontos" (os 4 jogos já lançados com maior desconto, mínimo 20 %, com pausa de 4 semanas e sem repetir nada da página; mostra quanto poupas) e 2 escalões de preço (20/10 €, até 4 jogos cada; jogos até 5 € não têm bloco próprio), com pausa de 4 semanas.
+2. `select`: escolhe o destaque, "Próximos Lançamentos" (4 pré-vendas por lançar, por relevância: famílias em `/tendencias/` primeiro, depois PVP; janela de 30 dias, completada com as mais próximas; sem pausa de 4 semanas), "Tendências" (os 4 primeiros de `/tendencias/`, sem pausa e sem repetir nada da página), "Maiores Descontos" (os 4 jogos já lançados com maior desconto, mínimo 20 %, com pausa de 4 semanas e sem repetir nada da página; mostra quanto poupas) e 2 escalões de preço (20/10 €, até 4 jogos cada; jogos até 5 € não têm bloco próprio), com pausa de 4 semanas.
 3. `streamer`: se existir `data/streamer_pick.json`, acrescenta o bloco manual "Destaque do Streamer" (ver abaixo).
 4. `render` + `discord`: geram `site/` e `data/discord_payload.json`. Todos os links passam por `affiliate.py`.
 5. GitHub Actions (`weekly.yml`) corre todos os dias às 08:00 UTC durante a PoC (em produção: à segunda-feira), publica no Pages e envia o Discord.
+
+Cada cartão mostra a loja (Steam, Microsoft Store, EA App, ...) numa etiqueta sobre a capa; no Discord a loja aparece a seguir ao preço.
 
 ## Destaque do streamer (manual)
 Um jogo escolhido à mão aparece numa secção própria no topo do site ("🎙️ Destaque do Streamer", com o selo "Escolha do streamer" e o comentário em citação) e como primeiro embed no Discord. Sem escolha, a secção não existe.

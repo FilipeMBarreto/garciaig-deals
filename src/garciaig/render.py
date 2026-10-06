@@ -29,6 +29,7 @@ def _card(g: Game) -> dict:
         "discount": g.discount,
         "date": fmt_date(g.release_date) if g.release_date else None,
         "preorder": g.preorder,
+        "store": g.store,
         "saving": fmt_price(g.retail - g.price) if g.price > 0 and g.retail > g.price else None,
     }
 
@@ -50,9 +51,9 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
         trending=[_card(g) for g in week.trending],
         discounts=[_card(g) for g in week.discounts],
         featured=_card(week.featured) if week.featured else None,
-        preorder=_card(week.preorder) if week.preorder else None,
+        upcoming=[_card(g) for g in week.upcoming],
         featured_notes=_notes(week, "destaque"),
-        preorder_notes=_notes(week, "pré-venda"),
+        upcoming_notes=[n for n in _notes(week, "pré-venda") if not n.startswith("Bloco '")],
         tiers=[(TIER_TITLES[k], [_card(g) for g in week.tiers[k]]) for k in ("20", "10")],
     )
     links = re.findall(r'href="(https://www\.instant-gaming\.com[^"]*)"', html)
