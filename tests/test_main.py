@@ -504,15 +504,18 @@ def test_republish_reuses_saved_week_games_without_fetching(tmp_path, monkeypatc
     assert target.id not in {g.id for g in out.upcoming}
 
 
-def test_republish_keeps_saved_streamer_data_and_source_for_same_pick(tmp_path, monkeypatch):
+def test_republish_rereads_page_for_page_derived_streamer(tmp_path, monkeypatch):
     data = tmp_path / "data"
     data.mkdir()
     streamer.save_pick(data / "streamer_pick.json", PICK_URL, "nota")
     first = run_pick(tmp_path)  # preço da página EUR
     assert first.streamer.id == 777
     no_fetch_all(monkeypatch)
-    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=_never_fetch)
-    assert out.streamer == first.streamer and out.streamer_source == first.streamer_source
+    calls = []
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="",
+                         fetch_pick=lambda url: calls.append(url) or pick_page())
+    assert len(calls) == 1  # dados vindos da página nunca são reutilizados (podem ser de código antigo)
+    assert out.streamer == first.streamer and out.streamer_source == "página EUR"
 
 
 def test_cli_prints_price_source(tmp_path, capsys, monkeypatch):
@@ -637,3 +640,61 @@ def test_no_debug_line_when_pick_comes_from_lists(tmp_path, capsys):
     assert main.cli(cli_args(tmp_path)) == 0
     assert "diagnóstico streamer" not in capsys.readouterr().out
     assert json.loads(read(tmp_path, "data/week.json"))["streamer_debug"] == ""
+
+
+# ---------- republish nunca reutiliza dados de página antigos ----------
+
+USD_PICK_PAGE = (
+    '<meta property="og:title" content="Comprar Pick Game - PC (Steam) - Europe">'
+    '<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" data-price-eur="49.19" />'
+    '<script>window.currencies = {"USD": {"tx": "1.118943771"}};</script>'
+    '<script>window.productModel = {"prod_id": 777, "price": "55.04", "retail": 78, "discount": 25, "preorder": false};</script>'
+)
+
+
+def _saved_week_with_stale_streamer(tmp_path, source):
+    """Semana guardada cujo streamer (id 777) tem retail == price e a origem indicada."""
+    data = tmp_path / "data"
+    data.mkdir()
+    streamer.save_pick(data / "streamer_pick.json", PICK_URL, "nota")
+    run_pick(tmp_path)
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    saved["streamer"].update(price=49.19, retail=49.19, discount=0)
+    saved["streamer_source"] = source
+    saved["streamer_debug"] = ""
+    (data / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    return data
+
+
+@pytest.mark.parametrize("source", ["página convertida", "", None, "página sem preço"])
+def test_republish_refetches_stale_page_derived_streamer(tmp_path, monkeypatch, source):
+    data = _saved_week_with_stale_streamer(tmp_path, source)
+    no_fetch_all(monkeypatch)
+    calls = []
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="",
+                         fetch_pick=lambda url: calls.append(url) or USD_PICK_PAGE)
+    assert len(calls) == 1
+    assert (out.streamer.price, out.streamer.retail, out.streamer.discount) == (49.19, 70.0, 30)
+    assert out.streamer_source == "página convertida" and "retail convertido 78→70" in out.streamer_debug
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert saved["streamer"]["retail"] == 70.0 and saved["streamer_debug"] == out.streamer_debug
+    assert "<s>70,00 €</s>" in read(tmp_path, "site/index.html")
+
+
+def test_republish_reuses_saved_streamer_only_when_its_source_is_eur_list(tmp_path, monkeypatch):
+    data = _saved_week_with_stale_streamer(tmp_path, "lista EUR")
+    no_fetch_all(monkeypatch)
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=_never_fetch)
+    assert out.streamer.retail == 49.19 and out.streamer_source == "lista EUR" and out.streamer_debug == ""
+
+
+def test_cli_republish_prints_debug_line_for_page_source(tmp_path, capsys, monkeypatch):
+    assert main.cli(cli_args(tmp_path)) == 0
+    streamer.save_pick(tmp_path / "data" / "streamer_pick.json", PICK_URL, "x")
+    monkeypatch.setattr(streamer, "fetch_product_page", lambda url: USD_PICK_PAGE)
+    no_fetch_all(monkeypatch)
+    capsys.readouterr()
+    assert main.cli(cli_args(tmp_path, "--republish")) == 0
+    out = capsys.readouterr().out
+    assert "Sem semana guardada" not in out
+    assert "  diagnóstico streamer: " in out and "retail convertido 78→70" in out

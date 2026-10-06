@@ -148,15 +148,13 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
     saved_pool = [g for g in (week.featured, *week.upcoming, *week.trending, *week.discounts,
                               *(g for games in week.tiers.values() for g in games)) if g]
     sources = {}
-    if week.streamer:
+    if week.streamer and (week.streamer_source or "").startswith("lista EUR"):
+        # só dados das listas (EUR) são reutilizáveis; os da página podem vir de código antigo e relêem-se
         saved_pool.append(week.streamer)
-        sources[week.streamer.id] = week.streamer_source or "lista EUR"
-    old_streamer, old_debug = week.streamer, week.streamer_debug
+        sources[week.streamer.id] = week.streamer_source
     week.streamer, week.streamer_note, pick_warnings, week.streamer_source, week.streamer_debug = streamer.resolve_full(
         pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page, pool=saved_pool, sources=sources)
     week.warnings.extend(pick_warnings)
-    if week.streamer and old_streamer and week.streamer.id == old_streamer.id and not week.streamer_debug:
-        week.streamer_debug = old_debug  # mesmo jogo reaproveitado da semana guardada: mantém o diagnóstico
     if week.streamer:
         # o jogo escolhido não pode repetir-se na página: sai das tendências e dos escalões
         # (os blocos podem ficar com menos de 4 jogos; nada é reposto sem nova recolha)
