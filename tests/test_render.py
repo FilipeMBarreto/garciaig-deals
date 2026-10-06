@@ -37,10 +37,11 @@ def test_render_escapes_names_and_formats_pt(tmp_path):
     assert "2026-W41" in html or "41" in html
 
 
-def test_render_has_disclosure_and_responsive_meta(tmp_path):
+def test_render_has_poc_footer_and_responsive_meta(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert 'name="viewport"' in html
-    assert "afiliado" in html.lower()
+    assert "proof of concept" in html.lower()
+    assert "links de afiliado" not in html.lower()
     assert 'rel="sponsored noopener"' in html
 
 
