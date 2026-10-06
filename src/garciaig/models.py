@@ -42,3 +42,4 @@ class Week:
     streamer: Game | None = None
     streamer_note: str = ""
     trending: list[Game] = field(default_factory=list)
+    discounts: list[Game] = field(default_factory=list)

@@ -9,6 +9,8 @@ from .models import Game, Week
 TIERS = (("20", 10.0, 20.0), ("10", 5.0, 10.0), ("5", 2.0, 5.0))
 PER_TIER = 4
 TRENDING_COUNT = 4
+DISCOUNT_COUNT = 4
+MIN_DISCOUNT = 20
 UNRANKED = 10_000  # igual a scrape.UNRANKED (rank < UNRANKED = veio de /tendencias/)
 
 _ADJ = r"(?:digital|deluxe|premium|ultimate|gold|complete|collector'?s?|standard|definitive|special|day one|launch)"
@@ -94,8 +96,32 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
     if len(trending) < TRENDING_COUNT:
         warnings.append(f"Bloco 'tendências': só {len(trending)} de {TRENDING_COUNT} candidatos disponíveis.")
 
+    # Maiores descontos: jogos já lançados, com pausa de 4 semanas e sem repetir nada da página
+    page = taken + trending
+    page_ids = {g.id for g in page}
+    page_families = {family(g.name) for g in page}
+    deal_pool = sorted(
+        (g for g in base
+         if not g.preorder and g.release_date <= today and g.price > 0 and g.retail > g.price
+         and g.discount >= MIN_DISCOUNT and g.id not in recent_ids
+         and g.id not in page_ids and family(g.name) not in page_families),
+        key=lambda g: (-g.discount, -(g.retail - g.price), g.rank, g.id),
+    )
+    discounts: list[Game] = []
+    deal_families: set[str] = set()
+    for g in deal_pool:
+        fam = family(g.name)
+        if fam in deal_families:
+            continue
+        deal_families.add(fam)
+        discounts.append(g)
+        if len(discounts) == DISCOUNT_COUNT:
+            break
+    if len(discounts) < DISCOUNT_COUNT:
+        warnings.append(f"Bloco 'maiores descontos': só {len(discounts)} de {DISCOUNT_COUNT} candidatos disponíveis.")
+
     # Blocos de preço
-    chosen = taken + trending
+    chosen = page + discounts
     chosen_ids = {g.id for g in chosen}
     seen_families = {family(g.name) for g in chosen}
     released = [
@@ -119,4 +145,4 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
             warnings.append(f"Bloco 'até {key} €': só {len(picked)} de {PER_TIER} candidatos disponíveis.")
         tiers[key] = picked
 
-    return Week(week_key(today), start, end, featured, preorder, tiers, warnings, trending=trending)
+    return Week(week_key(today), start, end, featured, preorder, tiers, warnings, trending=trending, discounts=discounts)

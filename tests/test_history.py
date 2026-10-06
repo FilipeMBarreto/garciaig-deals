@@ -20,7 +20,7 @@ def test_record_save_load_roundtrip(tmp_path):
     p = tmp_path / "h.json"
     history.save(p, h)
     assert history.load(p) == h
-    assert h["weeks"][0] == {"week": "2026-W40", "featured": 1, "preorder": 2, "tiers": {"20": [3], "10": [], "5": []}}
+    assert h["weeks"][0] == {"week": "2026-W40", "featured": 1, "preorder": 2, "tiers": {"20": [3], "10": [], "5": []}, "discounts": []}
 
 
 def test_record_same_week_is_idempotent():
@@ -54,3 +54,21 @@ def test_legacy_entry_with_tier_2_still_loads_and_counts_for_pause(tmp_path):
     assert history.recent_ids(h, "2026-W41") == {3, 4, 9}
     h2 = history.record(h, week("2026-W41", tiers={"20": [g(5)], "10": [], "5": []}))
     assert [w["week"] for w in h2["weeks"]] == ["2026-W40", "2026-W41"]
+
+
+def test_record_stores_discounts_and_recent_ids_unions_them():
+    w = week("2026-W40", tiers={"20": [g(3)], "10": [], "5": []})
+    w.discounts = [g(7), g(8)]
+    h = history.record({"weeks": []}, w)
+    assert h["weeks"][0]["discounts"] == [7, 8]
+    assert h["weeks"][0]["tiers"] == {"20": [3], "10": [], "5": []}
+    assert history.recent_ids(h, "2026-W41") == {3, 7, 8}
+
+
+def test_trending_does_not_count_for_pause_and_legacy_entries_without_discounts_work():
+    w = week("2026-W40", tiers={"20": [g(3)], "10": [], "5": []})
+    w.trending = [g(50)]
+    h = history.record({"weeks": []}, w)
+    assert history.recent_ids(h, "2026-W41") == {3}
+    legacy = {"weeks": [{"week": "2026-W39", "featured": None, "preorder": None, "tiers": {"20": [4]}}]}
+    assert history.recent_ids(legacy, "2026-W41") == {4}

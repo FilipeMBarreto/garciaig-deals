@@ -124,3 +124,20 @@ def test_trending_singular_and_empty(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     start = html.index("Tendências do Momento")
     assert "Sem candidatos esta semana." in html[start:html.index("</section>", start)]
+
+
+def test_discounts_section_order_saving_line_only_there_and_empty(tmp_path):
+    w = make_week()
+    w.trending = [game(50, "Hot", 12)]
+    w.discounts = [game(60 + i, f"Deal {i}", 10) for i in range(4)]  # retail = 15 -> poupa 5,00 €
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "<h2>🏷️ Maiores Descontos · 4 jogos</h2>" in html
+    assert html.index("Tendências do Momento") < html.index("Maiores Descontos") < html.index("Até 20 €")
+    assert html.count("Poupas 5,00 €") == 4
+    start = html.index("Maiores Descontos")
+    assert html[start:html.index("</section>", start)].count("Poupas") == 4
+    assert "https://www.instant-gaming.com/pt/60-comprar-slug-60/?igr=garciap" in html
+    empty = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    start = empty.index("Maiores Descontos")
+    assert "Sem candidatos esta semana." in empty[start:empty.index("</section>", start)]
+    assert "Poupas" not in empty

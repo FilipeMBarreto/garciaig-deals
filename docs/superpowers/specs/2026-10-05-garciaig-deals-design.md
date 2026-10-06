@@ -43,6 +43,7 @@ Semana ISO (segunda a domingo) da data de execução; o workflow corre à segund
 | Pré-venda da semana seguinte | jogo com lançamento na semana ISO seguinte, o mais próximo; se não houver, a pré-venda mais próxima depois (com aviso) | Isento |
 | Destaque do streamer | escolha manual (`data/streamer_pick.json`, link da Instant Gaming + comentário); só aparece se existir; página lida 1 vez na geração; falha → sem bloco e com aviso | Isento |
 | Tendências do momento | os 4 primeiros de `/tendencias/` (jogo de PC, não DLC, preço > 0; pré-vendas permitidas), uma edição por família; sem pausa de 4 semanas e não entram no histórico. Exclui destaque, pré-venda e o destaque do streamer (por id e família); os escalões de preço excluem também estes jogos | Isento |
+| Maiores descontos | 4 jogos de PC (não DLC) já lançados, preço > 0 e desconto ≥ 20 %; ordenados por desconto, depois poupança absoluta; uma edição por família. Pausa de 4 semanas (ids guardados em `discounts` no histórico). Não repete jogos de destaque, pré-venda, streamer ou tendências (id e família); os escalões de preço excluem também estes jogos | Sim |
 | Até 20 € | 4 jogos lançados, preço em (10, 20] | Sim |
 | Até 10 € | idem, (5, 10] | Sim |
 | Até 5 € | idem, (2, 5] | Sim |

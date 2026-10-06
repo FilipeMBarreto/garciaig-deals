@@ -29,6 +29,7 @@ def _card(g: Game) -> dict:
         "discount": g.discount,
         "date": fmt_date(g.release_date) if g.release_date else None,
         "preorder": g.preorder,
+        "saving": fmt_price(g.retail - g.price) if g.price > 0 and g.retail > g.price else None,
     }
 
 
@@ -47,6 +48,7 @@ def render_site(week: Week, out_dir: Path, today: date) -> Path:
         streamer=_card(week.streamer) if week.streamer else None,
         streamer_note=week.streamer_note.strip() if week.streamer else "",
         trending=[_card(g) for g in week.trending],
+        discounts=[_card(g) for g in week.discounts],
         featured=_card(week.featured) if week.featured else None,
         preorder=_card(week.preorder) if week.preorder else None,
         featured_notes=_notes(week, "destaque"),

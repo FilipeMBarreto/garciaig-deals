@@ -259,3 +259,79 @@ def test_real_snapshot_trending():
     assert all(g.rank < scrape.UNRANKED for g in w.trending)
     assert len({select.family(g.name) for g in w.trending}) == 4
     assert not {g.id for g in w.trending} & {w.featured.id, w.preorder.id}
+
+
+# ---------- Maiores descontos ----------
+
+def disc(i, name, price, retail, *, rank=10_000, **kw):
+    pct = round((1 - price / retail) * 100) if retail else 0
+    return mk(i, name, price, date(2026, 9, 1), rank=rank, retail=retail, discount=pct, **kw)
+
+
+def test_discounts_pick_highest_discount_tiebreak_by_saving():
+    pool = base_pool() + [
+        disc(400, "A", 10, 100),    # 90 %
+        disc(401, "B", 50, 100),    # 50 %, poupa 50
+        disc(402, "C", 25, 50),     # 50 %, poupa 25
+        disc(403, "D", 8, 10),      # 20 %
+        disc(404, "E", 9, 10),      # 10 % (< mínimo)
+        disc(405, "F", 40, 100),    # 60 %
+    ]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.discounts] == [400, 405, 401, 402]
+    assert select.DISCOUNT_COUNT == 4 and select.MIN_DISCOUNT == 20
+
+
+def test_discounts_exclusions():
+    pre = mk(410, "Pre", 5, date(2026, 9, 1), preorder=True, retail=50, discount=90)
+    future = mk(411, "Future", 5, date(2026, 12, 1), retail=50, discount=90)
+    pool = base_pool() + [
+        pre, future,
+        disc(412, "Dlc", 5, 50, dlc=True), disc(413, "Console", 5, 50, pc=False), disc(414, "Free", 0, 50),
+        mk(415, "Same price", 10, date(2026, 9, 1), retail=10, discount=50),
+        mk(416, "Inverted", 12, date(2026, 9, 1), retail=10, discount=50),
+        disc(417, "Recent", 5, 50),
+        mk(418, "No date", 5, None, retail=50, discount=90),
+        disc(419, "Ok", 20, 50),
+    ]
+    w = select.select_week(pool, {417}, set(), TODAY)
+    assert [g.id for g in w.discounts] == [419]
+
+
+def test_discounts_not_repeated_from_featured_preorder_streamer_trending():
+    pick = disc(420, "Pick", 5, 50)
+    pool = base_pool() + [
+        mk(10, "Now", 40, date(2026, 10, 6), preorder=True),
+        pick, disc(421, "Pick Deluxe Edition", 5, 50),
+        disc(422, "Hot", 5, 50, rank=0), disc(423, "Hot Deluxe Edition", 5, 50),
+        disc(424, "Zoo Deluxe Edition", 5, 50),
+        disc(425, "Fine", 20, 50),
+    ]
+    w = select.select_week(pool, set(), set(), TODAY, exclude_games=[pick])
+    assert [g.id for g in w.trending] == [422]
+    assert [g.id for g in w.discounts] == [425]
+
+
+def test_discounts_dedupe_families_and_cap_four():
+    pool = base_pool() + [disc(430, "Twin", 5, 50), disc(431, "Twin Deluxe Edition", 4, 50)]
+    pool += [disc(440 + n, f"G{n}", 20 - n, 50) for n in range(6)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    ids = [g.id for g in w.discounts]
+    assert len(ids) == 4 and not (430 in ids and 431 in ids)
+
+
+def test_discounts_underfilled_warning():
+    w = select.select_week(base_pool() + [disc(450, "Solo", 5, 50)], set(), set(), TODAY)
+    msg = "Bloco 'maiores descontos': só 1 de 4 candidatos disponíveis."
+    assert msg in w.warnings and "destaque" not in msg.lower() and "pré-venda" not in msg.lower()
+
+
+def test_tiers_exclude_discount_ids_and_families():
+    pool = base_pool() + [
+        disc(460, "Deal", 15, 60),                   # 75 % -> descontos, não escalão
+        mk(461, "Deal Deluxe Edition", 15, date(2026, 9, 1)),
+        mk(462, "Plain", 15, date(2026, 9, 1)),
+    ]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.discounts] == [460]
+    assert [g.id for g in w.tiers["20"]] == [462]

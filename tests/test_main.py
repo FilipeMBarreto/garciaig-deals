@@ -307,3 +307,54 @@ def test_republish_new_streamer_is_dropped_from_trending_and_tiers(tmp_path, mon
         assert v.id not in {g.id for games in out.tiers.values() for g in games}
         # blocos podem ficar com menos de 4 jogos; nada é reposto
         assert len(out.trending) <= 4
+
+
+# ---------- Maiores descontos ----------
+
+def test_end_to_end_discounts_block(tmp_path):
+    (tmp_path / "data").mkdir()
+    week = run_pick(tmp_path)
+    assert week.discounts and len(week.discounts) <= 4
+    assert all(g.discount >= 20 and g.retail > g.price for g in week.discounts)
+    page_ids = ([week.featured.id, week.preorder.id] + [g.id for g in week.trending] + [g.id for g in week.discounts]
+                + [g.id for games in week.tiers.values() for g in games])
+    assert len(page_ids) == len(set(page_ids))
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert [g["id"] for g in saved["discounts"]] == [g.id for g in week.discounts]
+    assert main._week_from_dict(saved) == week
+    hist = json.loads(read(tmp_path, "data/history.json"))
+    assert hist["weeks"][0]["discounts"] == [g.id for g in week.discounts]
+    html = read(tmp_path, "site/index.html")
+    assert html.index("Tendências do Momento") < html.index("Maiores Descontos") < html.index("Até 20 €")
+
+
+def test_cli_prints_discounts_count_and_names(tmp_path, capsys):
+    assert main.cli(cli_args(tmp_path, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    assert "maiores descontos:" in out
+
+
+def test_legacy_week_without_discounts_raises_and_cli_falls_back(tmp_path, capsys, monkeypatch):
+    assert main.cli(cli_args(tmp_path)) == 0
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    del saved["discounts"]
+    (tmp_path / "data" / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(main.NoSavedWeek):
+        main.republish(TODAY, data_dir=tmp_path / "data", out_dir=tmp_path / "site", site_url="")
+    capsys.readouterr()
+    assert main.cli(cli_args(tmp_path, "--republish")) == 0
+    assert "Sem semana guardada para esta semana; a fazer execução completa." in capsys.readouterr().out
+    assert "discounts" in json.loads(read(tmp_path, "data/week.json"))
+
+
+def test_republish_new_streamer_dropped_from_discounts(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    first = run_pick(tmp_path)
+    v = first.discounts[0]
+    no_fetch_all(monkeypatch)
+    streamer.save_pick(data / "streamer_pick.json", f"https://www.instant-gaming.com/pt/{v.id}-comprar-{v.seo_name}/")
+    page_html = (f'<meta property="og:title" content="Comprar {v.name} - PC (Steam) - Europe">'
+                 f'<script>window.productModel = {{"prod_id": {v.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": false}};</script>')
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=lambda url: page_html)
+    assert v.id not in {g.id for g in out.discounts} and len(out.discounts) == len(first.discounts) - 1

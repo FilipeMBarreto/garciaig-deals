@@ -154,3 +154,22 @@ def test_trending_embed_order_color_and_links():
 
 def test_trending_embed_omitted_when_empty():
     assert not any("Tendências" in e["title"] for e in discord.build_payload(make_week())["embeds"])
+
+
+def test_discounts_embed_order_percent_color_and_links():
+    w = make_week()
+    w.trending = [game(50, "Hot", 12)]
+    w.discounts = [Game(60 + i, f"Deal [{i}]", f"slug-{60 + i}", 10, 25, 60, 1791244800, False, False, True, 5, 0) for i in range(4)]
+    p = discord.build_payload(w)
+    titles = [e["title"] for e in p["embeds"]]
+    i = titles.index("🏷️ Maiores descontos")
+    assert i == titles.index("🔥 Tendências do momento") + 1
+    assert i < next(k for k, t in enumerate(titles) if "até 20" in t.lower())
+    e = p["embeds"][i]
+    assert e["color"] == 0xF59E0B and e["description"].count("(-60 %)") == 4 and "10,00 €" in e["description"]
+    links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", json.dumps(p, ensure_ascii=False))
+    assert len(links) == 3 + 1 + 4 and all(l.endswith("?igr=garciap") for l in links)
+
+
+def test_discounts_embed_omitted_when_empty():
+    assert not any("descontos" in e["title"].lower() for e in discord.build_payload(make_week())["embeds"])

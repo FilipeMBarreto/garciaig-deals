@@ -42,6 +42,7 @@ def _week_dict(w: Week) -> dict:
         "streamer": _game_dict(w.streamer),
         "streamer_note": w.streamer_note,
         "trending": [_game_dict(g) for g in w.trending],
+        "discounts": [_game_dict(g) for g in w.discounts],
     }
 
 
@@ -63,6 +64,7 @@ def _week_from_dict(d: dict) -> Week:
         streamer=_game_from_dict(d.get("streamer")),
         streamer_note=d.get("streamer_note", ""),
         trending=[_game_from_dict(g) for g in d.get("trending", [])],
+        discounts=[_game_from_dict(g) for g in d.get("discounts", [])],
     )
 
 
@@ -111,7 +113,7 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
         saved = json.loads((data_dir / "week.json").read_text(encoding="utf-8"))
         if saved["week"] != select.week_key(today):
             raise NoSavedWeek("A semana guardada é de outra semana.")
-        if "trending" not in saved:
+        if "trending" not in saved or "discounts" not in saved:
             raise NoSavedWeek("A semana guardada é de uma versão antiga (sem tendências).")
         week = _week_from_dict(saved)
     except NoSavedWeek:
@@ -128,6 +130,7 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
         gone_ids, gone_fam = {week.streamer.id}, {select.family(week.streamer.name)}
         keep = lambda g: g.id not in gone_ids and select.family(g.name) not in gone_fam  # noqa: E731
         week.trending = [g for g in week.trending if keep(g)]
+        week.discounts = [g for g in week.discounts if keep(g)]
         week.tiers = {k: [g for g in games if keep(g)] for k, games in week.tiers.items()}
     _write_outputs(week, today, data_dir, Path(out_dir), site_url)
     return week
@@ -161,6 +164,7 @@ def cli(argv: list[str] | None = None) -> int:
     if week.streamer:
         print(f"  destaque do streamer: {week.streamer.name!r}")
     print(f"  tendências: {len(week.trending)} jogos")
+    print(f"  maiores descontos: {len(week.discounts)} jogos" + "".join(f"\n    - {g.name} (-{g.discount} %)" for g in week.discounts))
     for key, games in week.tiers.items():
         print(f"  até {key} €: {len(games)} jogos")
     for w in week.warnings:

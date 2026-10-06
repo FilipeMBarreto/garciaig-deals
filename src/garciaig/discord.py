@@ -18,9 +18,9 @@ def _md(text: str) -> str:
     return re.sub(r"([\[\]\\*_`~|>])", r"\\\1", text)
 
 
-def _line(g: Game) -> str:
+def _line(g: Game, show_discount: bool = False) -> str:
     price = fmt_price(g.price) if g.price > 0 else NO_PRICE
-    return f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{price}**"
+    return f"[{_md(g.name)}]({affiliate.game_url(g.id, g.seo_name)}) — **{price}**" + (f" (-{g.discount} %)" if show_discount and g.discount > 0 else "")
 
 
 def build_payload(week: Week, site_url: str = "") -> dict:
@@ -49,6 +49,12 @@ def build_payload(week: Week, site_url: str = "") -> dict:
             "title": "🔥 Tendências do momento",
             "description": "\n".join(f"• {_line(g)}" for g in week.trending),
             "color": 0xEF4444,
+        })
+    if week.discounts:
+        embeds.append({
+            "title": "🏷️ Maiores descontos",
+            "description": "\n".join(f"• {_line(g, True)}" for g in week.discounts),
+            "color": 0xF59E0B,
         })
     for key in ("20", "10", "5"):
         games = week.tiers.get(key) or []

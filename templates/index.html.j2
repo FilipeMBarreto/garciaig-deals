@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-{% macro card(g, big=False, streamer=False, note="") %}
+{% macro card(g, big=False, streamer=False, note="", saving=False) %}
   <article class="card{% if big %} card-big{% endif %}{% if streamer %} card-streamer{% endif %}">
     <a class="cover" href="{{ g.url }}" target="_blank" rel="sponsored noopener" aria-label="{{ g.name }}">
       <img src="{{ g.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">
@@ -19,6 +19,7 @@
       <h3>{{ g.name }}</h3>
       {% if g.date %}<p class="meta">{% if g.preorder %}Pré-venda · {% endif %}Lançamento: {{ g.date }}</p>{% endif %}
       <p class="price"><strong>{{ g.price }}</strong>{% if g.retail %} <s>{{ g.retail }}</s>{% endif %}</p>
+      {% if saving and g.saving %}<p class="saving">Poupas {{ g.saving }}</p>{% endif %}
       {% if note %}<blockquote class="note-streamer">{{ note }}</blockquote>{% endif %}
       <a class="btn" href="{{ g.url }}" target="_blank" rel="sponsored noopener">Ver na Instant Gaming</a>
     </div>
@@ -57,6 +58,15 @@
     <h2>🔥 Tendências do Momento{% if trending %} · {{ trending|length }} {{ 'jogo' if trending|length == 1 else 'jogos' }}{% endif %}</h2>
     {% if trending %}
     <div class="grid">{% for g in trending %}{{ card(g) }}{% endfor %}</div>
+    {% else %}
+    <p class="empty">Sem candidatos esta semana.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>🏷️ Maiores Descontos{% if discounts %} · {{ discounts|length }} {{ 'jogo' if discounts|length == 1 else 'jogos' }}{% endif %}</h2>
+    {% if discounts %}
+    <div class="grid">{% for g in discounts %}{{ card(g, saving=true) }}{% endfor %}</div>
     {% else %}
     <p class="empty">Sem candidatos esta semana.</p>
     {% endif %}
