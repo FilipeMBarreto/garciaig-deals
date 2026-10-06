@@ -106,6 +106,26 @@ def _to_float(value) -> float | None:
     return x if x == x and x > 0 else None  # exclui NaN e <= 0
 
 
+def _rate(html: str, currency: str) -> float | None:
+    """Taxa de câmbio (a partir do EUR) da moeda do visitante, em window.currencies."""
+    try:
+        return _to_float(scrape.extract_window_json(html, "currencies")[currency]["tx"])
+    except (scrape.ScrapeError, KeyError, TypeError):
+        return None
+
+
+def _eur_retail_from_visitor(html: str, currency: str, visitor_retail, price: float) -> float:
+    """Preço original em EUR a partir do `retail` da página (inteiro, na moeda do visitante).
+
+    Com taxa >= 1 o erro de converter de volta um inteiro arredondado é <= 0,5 €, por isso
+    arredondar ao euro reproduz o inteiro da página em EUR. Taxa < 1 ou dados em falta: sem retail."""
+    tx, retail = _rate(html, currency), _to_float(visitor_retail)
+    if tx is None or tx < 1.0 or retail is None:
+        return price
+    eur = float(round(retail / tx))
+    return eur if eur > price else price
+
+
 def _eur_price_from_page(html: str, currency: str, visitor_price: float | None) -> float:
     """Preço em EUR de uma página na moeda do visitante; 0.0 se não houver forma fiável."""
     for attrs in _meta_tags(html):
@@ -115,10 +135,7 @@ def _eur_price_from_page(html: str, currency: str, visitor_price: float | None) 
                 return round(eur, 2)
             visitor_price = _to_float(attrs.get("content")) or visitor_price
             break
-    try:
-        tx = _to_float(scrape.extract_window_json(html, "currencies")[currency]["tx"])
-    except (scrape.ScrapeError, KeyError, TypeError):
-        tx = None
+    tx = _rate(html, currency)
     if visitor_price and tx:
         return round(visitor_price / tx, 2)
     return 0.0
@@ -163,7 +180,8 @@ def parse_product_page_ex(html: str, game_id: int, seo_name: str) -> tuple[Game,
     else:
         # moeda desconhecida ou não-EUR: retail/desconto não são fiáveis
         price = _eur_price_from_page(html, currency, _to_float(model.get("price"))) if currency else 0.0
-        retail, discount = price, 0
+        retail = _eur_retail_from_visitor(html, currency, model.get("retail"), price) if price > 0 else price
+        discount = round((1 - price / retail) * 100) if retail > price else 0
         source = "página convertida" if price > 0 else "página sem preço"
     image = _meta_content(html, "og:image") or ""
     v = re.search(r"[?&]v=(\d+)", image)

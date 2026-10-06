@@ -257,3 +257,13 @@ def test_css_version_changes_with_content(tmp_path):
     b.write_bytes(b"body{color:blue}")
     va, vb = render.css_version(a), render.css_version(b)
     assert len(va) == len(vb) == 10 and va != vb and va == render.css_version(a)
+
+
+def test_streamer_big_card_shows_struck_original_price_and_discount_badge(tmp_path):
+    import dataclasses
+    w = make_week()
+    w.streamer = dataclasses.replace(game(7, "Pick", 49.19), retail=70.0, discount=30)
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    card = html[html.index("card-streamer"):]
+    card = card[:card.index("</article>")]
+    assert "<s>70,00 €</s>" in card and "49,19 €" in card and "-30%" in card

@@ -31,6 +31,7 @@ Um jogo escolhido à mão aparece num cartão grande no topo do site (sem títul
 - Uma execução do formulário só com comentário e sem link é ignorada (faz uma execução completa normal). A escolha não é deduplicada face aos jogos do destaque semanal nem dos blocos de preço: pode repetir-se.
 - Duas execuções manuais lançadas em simultâneo podem ser fundidas pela configuração de concorrência do GitHub: lance-as uma de cada vez.
 - Links soltos no comentário são removidos automaticamente.
+- Se o jogo não estiver nas listas, o preço é lido da página: quando esta vem noutra moeda, o preço e o preço original (inteiro) são convertidos para euros.
 - Se a página do jogo não puder ser lida, o site é gerado sem esta secção e a execução mostra um aviso; nunca falha por isso.
 
 **Localmente:**

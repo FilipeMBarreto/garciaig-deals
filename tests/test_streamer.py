@@ -337,18 +337,18 @@ def test_page_eur_uses_product_model():
     assert (g.price, g.retail, g.discount) == (49.19, 70.0, 30) and source == "página EUR"
 
 
-def test_page_usd_uses_data_price_eur_and_drops_retail_and_discount():
+def test_page_usd_uses_data_price_eur_and_converts_integer_retail():
     meta = '<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" data-price-eur="49.19" />'
     html = page(model=GEARS_MODEL_USD, currency_meta=meta, extra='<span data-price-eur="1.23"></span>' + CURRENCIES)
     g, source = streamer.parse_product_page_ex(html, 21378, "s")
-    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0) and source == "página convertida"
+    assert (g.price, g.retail, g.discount) == (49.19, 70.0, 30) and source == "página convertida"  # retail 78 USD -> 70 EUR
     assert streamer.parse_product_page(html, 21378, "s") == g
 
 
 def test_page_usd_without_data_price_eur_converts_with_currency_rate():
     meta = '<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" />'
     g, source = streamer.parse_product_page_ex(page(model=GEARS_MODEL_USD, currency_meta=meta, extra=CURRENCIES), 21378, "s")
-    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0) and source == "página convertida"
+    assert (g.price, g.retail, g.discount) == (49.19, 70.0, 30) and source == "página convertida"
 
 
 @pytest.mark.parametrize("meta,extra", [
@@ -388,3 +388,42 @@ def test_resolve_pool_source_override_and_miss_uses_fetch(tmp_path):
     seen = []
     g, _, warns, source = streamer.resolve_ex(p, lambda u: seen.append(u) or page(), pool=[pool_game(id=999)])
     assert seen == [GOOD] and g.price == 24.99 and source == "página EUR" and warns == []
+
+
+# ---------- preço original em páginas não-EUR (retail inteiro / tx) ----------
+
+TX_USD = '<script>window.currencies = {"EUR": {"tx": 1}, "USD": {"tx": "1.118943771"}, "GBP": {"tx": "0.847877"}};</script>'
+
+
+def usd_page(eur_price, visitor_price, retail, *, currency="USD", extra=TX_USD, eur_attr=True):
+    attr = f' data-price-eur="{eur_price}"' if eur_attr else ""
+    meta = f'<meta itemprop="priceCurrency" content="{currency}" /><meta itemprop="price" content="{visitor_price}"{attr} />'
+    model = f'{{"prod_id": 21378, "price": "{visitor_price}", "retail": {retail}, "discount": 25, "preorder": false}}'
+    return page(model=model, currency_meta=meta, extra=extra)
+
+
+@pytest.mark.parametrize("eur,visitor,retail,exp_retail,exp_discount", [
+    (49.19, 55.04, 78, 70.0, 30),      # Gears of War: E-Day
+    (69.99, 78.31, 112, 100.0, 30),    # Premium Edition
+    (17.99, 20.13, 62, 55.0, 67),      # Beast of Reincarnation
+])
+def test_non_eur_page_converts_integer_retail_back_to_eur(eur, visitor, retail, exp_retail, exp_discount):
+    g, source = streamer.parse_product_page_ex(usd_page(eur, visitor, retail), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (eur, exp_retail, exp_discount) and source == "página convertida"
+
+
+def test_non_eur_page_with_rate_below_one_keeps_conservative_behaviour():
+    g, _ = streamer.parse_product_page_ex(usd_page(49.19, 41.7, 59, currency="GBP"), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
+
+
+def test_non_eur_page_without_rate_or_retail_keeps_conservative_behaviour():
+    g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 78, extra=""), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
+    g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 0), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
+
+
+def test_non_eur_retail_not_above_price_means_no_discount():
+    g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 55), 21378, "s")  # 55 / 1.1189 = 49 <= 49.19
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
