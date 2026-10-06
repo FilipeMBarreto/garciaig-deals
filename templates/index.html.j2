@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-{% macro card(g, big=False, streamer=False, note="", saving=False) %}
+{% macro card(g, big=False, streamer=False, note="", saving=False, tag="") %}
   <article class="card{% if big %} card-big{% endif %}{% if streamer %} card-streamer{% endif %}">
     <a class="cover" href="{{ g.url }}" target="_blank" rel="sponsored noopener" aria-label="{{ g.name }}">
       <img src="{{ g.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">
@@ -16,7 +16,7 @@
       {% if g.store %}<span class="store">{{ g.store }}</span>{% endif %}
     </a>
     <div class="body">
-      {% if streamer %}<span class="badge-streamer">Escolha do streamer</span>{% endif %}
+      {% if streamer %}<span class="tag-big tag-streamer">Escolha do streamer</span>{% elif tag %}<span class="tag-big tag-featured">{{ tag }}</span>{% endif %}
       <h3>{{ g.name }}</h3>
       {% if g.date %}<p class="meta">{% if g.preorder %}Pré-venda · {% endif %}Lançamento: {{ g.date }}</p>{% endif %}
       <p class="price"><strong>{{ g.price }}</strong>{% if g.retail %} <s>{{ g.retail }}</s>{% endif %}</p>
@@ -37,15 +37,15 @@
 
 <main class="wrap">
   {% if streamer %}
-  <section>
-    <h2>🎙️ Destaque do Streamer</h2>
+  <section class="top-card">
+    <h2 class="sr-only">Destaque do Streamer</h2>
     {{ card(streamer, true, true, streamer_note) }}
   </section>
   {% endif %}
 
-  <section>
-    <h2>⭐ Destaque da Semana</h2>
-    {% if featured %}{{ card(featured, true) }}{% else %}<p class="empty">Sem destaque esta semana.</p>{% endif %}
+  <section class="top-card">
+    <h2 class="sr-only">Destaque da Semana</h2>
+    {% if featured %}{{ card(featured, true, tag="Destaque da semana") }}{% else %}<p class="empty">Sem destaque esta semana.</p>{% endif %}
     {% for n in featured_notes %}<p class="note">{{ n }}</p>{% endfor %}
   </section>
 

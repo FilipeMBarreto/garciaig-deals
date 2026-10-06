@@ -70,9 +70,9 @@ def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
     w.streamer = game(7, "Pick <b>Game</b>", 12.5)
     w.streamer_note = "Joguem <script>alert(1)</script> & divirtam-se"
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert "🎙️ Destaque do Streamer" in html
+    assert '<h2 class="sr-only">Destaque do Streamer</h2>' in html
     assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Próximos Lançamentos")
-    assert "Escolha do streamer" in html and 'class="badge-streamer"' in html
+    assert "Escolha do streamer" in html and '<span class="tag-big tag-streamer">Escolha do streamer</span>' in html
     assert '<blockquote class="note-streamer">Joguem &lt;script&gt;alert(1)&lt;/script&gt; &amp; divirtam-se</blockquote>' in html
     assert "<script>" not in html and "Pick &lt;b&gt;Game&lt;/b&gt;" in html
     assert "https://www.instant-gaming.com/pt/7-comprar-slug-7/?igr=garciap" in html
@@ -87,7 +87,7 @@ def test_streamer_without_note_has_no_blockquote(tmp_path):
 
 def test_no_streamer_no_section(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert "badge-streamer" not in html and "<blockquote" not in html and "Destaque do Streamer" not in html
+    assert "tag-streamer" not in html and "Escolha do streamer" not in html and "<blockquote" not in html and "Destaque do Streamer" not in html
 
 
 def test_zero_price_shows_see_price_label(tmp_path):
@@ -164,8 +164,8 @@ def test_no_count_text_in_site_headings_or_discord_titles(tmp_path):
     w.discounts = [game(60 + i, f"Deal {i}", 10) for i in range(4)]
     w.streamer = game(7, "Pick", 12)
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    heads = re.findall(r"<h2>(.*?)</h2>", html)
-    assert heads == ["🎙️ Destaque do Streamer", "⭐ Destaque da Semana", "⏳ Próximos Lançamentos", "🔥 Tendências",
+    heads = re.findall(r"<h2[^>]*>(.*?)</h2>", html)
+    assert heads == ["Destaque do Streamer", "Destaque da Semana", "⏳ Próximos Lançamentos", "🔥 Tendências",
                      "🏷️ Maiores Descontos", "Até 20 €", "Até 10 €"]
     assert not any("jogo" in h.lower() for h in heads)
     titles = [e["title"] for e in discord.build_payload(w)["embeds"]]
@@ -211,3 +211,33 @@ def test_store_pill_on_cover_only_when_store_set(tmp_path):
     w.featured = dataclasses.replace(w.featured, store="Epic Games")
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert html.count('<span class="store">') == 2 and '<span class="store">Epic Games</span>' in html
+
+
+def test_big_card_titles_are_screen_reader_only_and_tags_sit_on_the_right_cards(tmp_path):
+    w = make_week()
+    w.streamer = game(7, "Pick", 12.5)
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert re.findall(r'<h2 class="sr-only">(.*?)</h2>', html) == ["Destaque do Streamer", "Destaque da Semana"]
+    assert "<h2>🎙️" not in html and "<h2>⭐" not in html
+    s_card = html[html.index("Escolha do streamer"):]
+    s_card = s_card[:s_card.index("</article>")]
+    assert "Pick" in s_card and "Destaque da semana" not in s_card
+    f_start = html.index('<span class="tag-big tag-featured">Destaque da semana</span>')
+    f_card = html[f_start:html.index("</article>", f_start)]
+    assert "Star Wars: Galactic Racer" in f_card and "Escolha do streamer" not in f_card
+    assert html.count("Escolha do streamer") == 1 and html.count("Destaque da semana") == 1
+    assert html.index("Escolha do streamer") < f_start
+
+
+def test_only_featured_tag_without_streamer_and_notes_stay_under_featured(tmp_path):
+    w = make_week()
+    w.warnings = ["Sem lançamentos na semana corrente; destaque tirado da semana anterior."]
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    assert "Escolha do streamer" not in html and html.count('class="tag-big tag-featured"') == 1
+    assert html.index('class="tag-big tag-featured"') < html.index("destaque tirado da semana anterior") < html.index("Próximos Lançamentos</h2>")
+
+
+def test_stylesheet_has_sr_only_and_shared_tag_rules():
+    css = (render.TEMPLATES / "style.css").read_text(encoding="utf-8")
+    assert ".sr-only{" in css and "clip" in css and ".tag-big{" in css and ".tag-featured{" in css and ".tag-streamer{" in css
+    assert "badge-streamer" not in css

@@ -22,7 +22,7 @@ python -m http.server 8765 --directory site
 Cada cartão mostra a loja (Steam, Microsoft Store, EA App, ...) numa etiqueta sobre a capa; no Discord a loja aparece a seguir ao preço.
 
 ## Destaque do streamer (manual)
-Um jogo escolhido à mão aparece numa secção própria no topo do site ("🎙️ Destaque do Streamer", com o selo "Escolha do streamer" e o comentário em citação) e como primeiro embed no Discord. Sem escolha, a secção não existe.
+Um jogo escolhido à mão aparece num cartão grande no topo do site (sem título visível), com a etiqueta "Escolha do streamer" e o comentário em citação; o destaque da semana segue-se, com a etiqueta "Destaque da semana" e como primeiro embed no Discord. Sem escolha, a secção não existe.
 
 **Pelo GitHub:** Actions → "Atualização semanal" → *Run workflow* → preencher o link do jogo na Instant Gaming (`https://www.instant-gaming.com/pt/NÚMERO-comprar-nome/`) e, se quiser, o comentário (até 280 caracteres). Para tirar o destaque, marcar "Remover o destaque do streamer".
 - Só quem tem permissão de escrita no repositório pode executar o workflow; o controlo de acesso é essa permissão do GitHub. Um URL "secreto" não protegeria nada num repositório público.
