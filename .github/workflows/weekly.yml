@@ -9,7 +9,7 @@ on:
         description: "Link do jogo na Instant Gaming (destaque do streamer)"
         type: string
         required: false
-        default: "https://www.instant-gaming.com/pt/22979-comprar-gears-of-war-e-day-premium-edition-pc-xbox-series-x-s-microsoft-store/"
+        default: "https://www.instant-gaming.com/pt/9572-comprar-gears-of-war-e-day-pc-xbox-series-x-s-microsoft-store/"
       streamer_note:
         description: "Comentário do streamer (opcional)"
         type: string
