@@ -42,6 +42,8 @@ def _week_dict(w: Week) -> dict:
         "streamer": _game_dict(w.streamer),
         "streamer_note": w.streamer_note,
         "streamer_source": w.streamer_source,
+        "retail_unknown": w.retail_unknown,
+        "pool_size": w.pool_size,
         "trending": [_game_dict(g) for g in w.trending],
         "discounts": [_game_dict(g) for g in w.discounts],
     }
@@ -65,6 +67,8 @@ def _week_from_dict(d: dict) -> Week:
         streamer=_game_from_dict(d.get("streamer")),
         streamer_note=d.get("streamer_note", ""),
         streamer_source=d.get("streamer_source", ""),
+        retail_unknown=d.get("retail_unknown", 0),
+        pool_size=d.get("pool_size", 0),
         trending=[_game_from_dict(g) for g in d.get("trending", [])],
         discounts=[_game_from_dict(g) for g in d.get("discounts", [])],
     )
@@ -91,6 +95,9 @@ def run(today: date, *, offline_dir: Path | None, data_dir: Path, out_dir: Path,
     week = select.select_week(pool, history.recent_ids(hist, key), history.preorder_ids(hist), today,
                               exclude_games=[pick] if pick else [])
     week.streamer, week.streamer_note, week.streamer_source = pick, pick_note, pick_source
+    week.retail_unknown, week.pool_size = sum(not g.retail_known for g in pool), len(pool)
+    if week.retail_unknown * 2 > week.pool_size:
+        week.warnings.append("Preços originais indisponíveis para mais de metade dos jogos.")
     week.warnings.extend(pick_warnings)
 
     if week.featured is None:
@@ -174,6 +181,8 @@ def cli(argv: list[str] | None = None) -> int:
     print(f"  próximos lançamentos: {len(week.upcoming)} jogos" + "".join(f"\n    - {g.name} ({g.store or 'loja n/d'}, {g.release_date})" for g in week.upcoming))
     if week.streamer:
         print(f"  destaque do streamer: {week.streamer.name!r} (preço: {week.streamer_source})")
+    if week.retail_unknown:
+        print(f"  preços originais em euros indisponíveis: {week.retail_unknown} de {week.pool_size} jogos")
     print(f"  tendências: {len(week.trending)} jogos")
     print(f"  maiores descontos: {len(week.discounts)} jogos" + "".join(f"\n    - {g.name} (-{g.discount} %)" for g in week.discounts))
     for key, games in week.tiers.items():

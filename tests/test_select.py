@@ -389,3 +389,11 @@ def test_trending_discounts_and_tiers_exclude_upcoming_ids_and_families():
     assert [g.id for g in w.upcoming] == [590]
     assert w.trending == [] and w.discounts == []
     assert [g.id for g in w.tiers["20"]] == [593]
+
+
+def test_discounts_ignore_unknown_retail_and_rank_by_eur_computed_discount():
+    from garciaig.models import Game
+    unknown = Game(600, "Unknown", "u", 5.0, 50.0, 90, ts(date(2026, 9, 1)), False, False, True, 0, 10_000, "", False)
+    pool = base_pool() + [unknown, disc(601, "Real small", 20, 30), disc(602, "Real big", 10, 50)]
+    w = select.select_week(pool, set(), set(), TODAY)
+    assert [g.id for g in w.discounts] == [602, 601]

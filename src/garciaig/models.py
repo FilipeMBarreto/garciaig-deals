@@ -19,6 +19,7 @@ class Game:
     updated_at: int = 0
     rank: int = 10_000
     store: str = ""
+    retail_known: bool = True  # False: sem preço original em EUR (retail = price, discount = 0)
 
     @property
     def release_date(self) -> date | None:
@@ -45,3 +46,5 @@ class Week:
     trending: list[Game] = field(default_factory=list)
     discounts: list[Game] = field(default_factory=list)
     streamer_source: str = ""  # de onde veio o preço do streamer (lista EUR, página EUR, ...)
+    retail_unknown: int = 0  # jogos da recolha sem preço original em euros
+    pool_size: int = 0

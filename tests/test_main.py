@@ -520,3 +520,59 @@ def test_cli_prints_price_source(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(streamer, "fetch_product_page", lambda url: pick_page())
     assert main.cli(cli_args(tmp_path)) == 0
     assert "(preço: página EUR)" in capsys.readouterr().out
+
+
+# ---------- retail/desconto em EUR ----------
+
+def test_week_json_retail_and_discount_match_eur_list_data(tmp_path):
+    (tmp_path / "data").mkdir()
+    week = run_pick(tmp_path)
+    raw = {}
+    for fn, name in [("tendencias", "searchResults"), ("pre-reservas", "searchResults")]:
+        for it in scrape.extract_window_json((FIX / f"{fn}.html").read_text(encoding="utf-8"), name)["hits"]:
+            raw[it["prod_id"]] = it
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    cards = [saved["featured"], *saved["upcoming"], *saved["trending"], *saved["discounts"]]
+    checked = 0
+    for g in cards:
+        eur = (raw.get(g["id"], {}).get("retail_prices") or {}).get("EUR")
+        if eur is None:
+            continue
+        retail = float(eur)
+        assert g["retail"] == retail and g["price"] == float(raw[g["id"]]["currency_prices"]["EUR"])
+        assert g["discount"] == (round((1 - g["price"] / retail) * 100) if retail > g["price"] else 0)
+        checked += 1
+    assert checked >= 4
+    assert saved["featured"]["retail"] == 59.99 and saved["featured"]["discount"] == 33
+    assert all(g.discount >= 20 and g.retail_known for g in week.discounts)
+
+
+def test_unknown_retail_counts_summary_and_majority_warning(tmp_path, monkeypatch, capsys):
+    from dataclasses import replace
+    real = scrape.build_pool
+
+    def mostly_unknown(*a):
+        pool = real(*a)
+        return [replace(g, retail=g.price, discount=0, retail_known=False) if i % 4 else g for i, g in enumerate(pool)]
+
+    monkeypatch.setattr(scrape, "build_pool", mostly_unknown)
+    assert main.cli(cli_args(tmp_path, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert saved["retail_unknown"] > saved["pool_size"] / 2
+    assert f"preços originais em euros indisponíveis: {saved['retail_unknown']} de {saved['pool_size']} jogos" in out
+    msg = "Preços originais indisponíveis para mais de metade dos jogos."
+    assert msg in saved["warnings"] and "destaque" not in msg.lower() and "pré-venda" not in msg.lower()
+    assert msg not in read(tmp_path, "site/index.html")
+
+
+def test_few_unknown_retail_prints_line_but_no_warning(tmp_path, monkeypatch, capsys):
+    from dataclasses import replace
+    real = scrape.build_pool
+    monkeypatch.setattr(scrape, "build_pool", lambda *a: [replace(g, retail=g.price, discount=0, retail_known=False) if i == 0 else g
+                                                          for i, g in enumerate(real(*a))])
+    assert main.cli(cli_args(tmp_path, "--dry-run")) == 0
+    out = capsys.readouterr().out
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert "preços originais em euros indisponíveis:" in out
+    assert not any("Preços originais" in w for w in saved["warnings"])

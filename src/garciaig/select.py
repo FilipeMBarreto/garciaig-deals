@@ -112,7 +112,7 @@ def select_week(pool: list[Game], recent_ids: set[int], preorder_ids: set[int], 
     page_families = {family(g.name) for g in page}
     deal_pool = sorted(
         (g for g in base
-         if not g.preorder and g.release_date <= today and g.price > 0 and g.retail > g.price
+         if not g.preorder and g.release_date <= today and g.price > 0 and g.retail_known and g.retail > g.price
          and g.discount >= MIN_DISCOUNT and g.id not in recent_ids
          and g.id not in page_ids and family(g.name) not in page_families),
         key=lambda g: (-g.discount, -(g.retail - g.price), g.rank, g.id),

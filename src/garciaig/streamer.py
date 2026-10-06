@@ -182,6 +182,7 @@ def parse_product_page_ex(html: str, game_id: int, seo_name: str) -> tuple[Game,
         updated_at=int(v.group(1)) if v else 0,
         rank=0,
         store=store,
+        retail_known=currency == "EUR",
     )
     return game, source
 

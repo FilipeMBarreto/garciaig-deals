@@ -49,12 +49,41 @@ def _platform_ids(raw) -> set[str]:
     return {str(p).strip() for p in parts if str(p).strip()}
 
 
+def _num(value) -> float | None:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return None
+    return x if x == x and x > 0 else None  # exclui NaN, 0 e negativos
+
+
+def _eur(mapping, *path) -> float | None:
+    for key in path:
+        mapping = mapping.get(key) if isinstance(mapping, dict) else None
+    return _num(mapping)
+
+
+def _eur_retail(item: dict) -> float | None:
+    """Preço original em EUR. Os campos `retail`/`discount` vêm na moeda do visitante (USD no runner dos EUA)."""
+    eur = _eur(item, "retail_prices", "EUR")
+    if eur is None and item.get("default_retail_currency") == "EUR":
+        eur = _num(item.get("default_retail"))
+    if eur is None and item.get("retail_currency") == "EUR":
+        eur = _num(item.get("retail"))
+    return eur
+
+
 def _to_game(item: dict, rank: int) -> Game:
-    price = float(item["price"])
-    retail = float(item.get("retail") or price)
-    discount = item.get("discount")
-    if discount is None:
-        discount = round((1 - price / retail) * 100) if retail > 0 else 0
+    price = _eur(item, "currency_prices", "EUR")
+    if price is None:
+        price = float(item["price"])
+    retail = _eur_retail(item)
+    known = retail is not None or price <= 0  # jogos grátis não têm preço original a conhecer
+    if retail is None or retail <= price:
+        discount = 0
+        retail = price if retail is None else max(retail, price)
+    else:
+        discount = round((1 - price / retail) * 100)
     return Game(
         id=int(item["prod_id"]),
         name=item["name"],
@@ -69,6 +98,7 @@ def _to_game(item: dict, rank: int) -> Game:
         updated_at=int(item.get("updated_at") or 0),
         rank=rank,
         store=str(item.get("type") or "").strip(),
+        retail_known=known,
     )
 
 
