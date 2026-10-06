@@ -106,39 +106,70 @@ def _to_float(value) -> float | None:
     return x if x == x and x > 0 else None  # exclui NaN e <= 0
 
 
-def _rate(html: str, currency: str) -> float | None:
-    """Taxa de câmbio (a partir do EUR) da moeda do visitante, em window.currencies."""
+def _rate(html: str, currency: str) -> tuple[float | None, str]:
+    """Taxa de câmbio (a partir do EUR) da moeda do visitante, em window.currencies, e a razão se faltar."""
     try:
-        return _to_float(scrape.extract_window_json(html, "currencies")[currency]["tx"])
-    except (scrape.ScrapeError, KeyError, TypeError):
-        return None
+        data = scrape.extract_window_json(html, "currencies")
+    except scrape.ScrapeError:
+        return None, "JSON inválido"
+    if data is None:
+        return None, "currencies ausente"
+    entry = data.get(currency) if isinstance(data, dict) else None
+    if not isinstance(entry, dict):
+        return None, "moeda ausente em currencies"
+    tx = _to_float(entry.get("tx"))
+    return (tx, "") if tx is not None else (None, "tx inválido")
 
 
-def _eur_retail_from_visitor(html: str, currency: str, visitor_retail, price: float) -> float:
-    """Preço original em EUR a partir do `retail` da página (inteiro, na moeda do visitante).
-
-    Com taxa >= 1 o erro de converter de volta um inteiro arredondado é <= 0,5 €, por isso
-    arredondar ao euro reproduz o inteiro da página em EUR. Taxa < 1 ou dados em falta: sem retail."""
-    tx, retail = _rate(html, currency), _to_float(visitor_retail)
-    if tx is None or tx < 1.0 or retail is None:
-        return price
-    eur = float(round(retail / tx))
-    return eur if eur > price else price
+def _price_meta(html: str) -> dict[str, str]:
+    return next((a for a in _meta_tags(html) if a.get("itemprop", "").lower() == "price"), {})
 
 
-def _eur_price_from_page(html: str, currency: str, visitor_price: float | None) -> float:
-    """Preço em EUR de uma página na moeda do visitante; 0.0 se não houver forma fiável."""
-    for attrs in _meta_tags(html):
-        if attrs.get("itemprop", "").lower() == "price":  # só o data-price-eur DESTE meta é deste produto
-            eur = _to_float(attrs.get("data-price-eur"))
-            if eur is not None:
-                return round(eur, 2)
-            visitor_price = _to_float(attrs.get("content")) or visitor_price
-            break
-    tx = _rate(html, currency)
-    if visitor_price and tx:
-        return round(visitor_price / tx, 2)
-    return 0.0
+def _raw(value) -> str:
+    return "n/d" if value is None else f"{value!r}({type(value).__name__})"
+
+
+def _non_eur_prices(html: str, currency: str, model: dict) -> tuple[float, float, int, str]:
+    """(preço EUR, retail EUR, desconto, diagnóstico) de uma página na moeda do visitante."""
+    pm = _price_meta(html)
+    eur_attr = _to_float(pm.get("data-price-eur"))  # só o do meta itemprop="price" é deste produto
+    visitor_price = _to_float(pm.get("content")) or _to_float(model.get("price"))
+    tx, why = _rate(html, currency) if currency else (None, "moeda ausente")
+    derived = False
+    if tx is None and visitor_price and eur_attr:
+        tx, derived = visitor_price / eur_attr, True
+    if eur_attr:
+        price = round(eur_attr, 2)
+    elif visitor_price and tx:
+        price = round(visitor_price / tx, 2)
+    else:
+        price = 0.0
+    visitor_retail = _to_float(model.get("retail"))
+    if price <= 0:
+        retail, outcome = price, "sem preço"
+    elif visitor_retail is None:
+        retail, outcome = price, "retail ausente"
+    elif tx is None:
+        retail, outcome = price, "sem taxa"
+    elif tx < 1.0:
+        retail, outcome = price, "taxa<1"
+    else:
+        eur = float(round(visitor_retail / tx))
+        if eur > price:
+            retail, outcome = eur, f"retail convertido {visitor_retail:g}→{eur:g}"
+        else:
+            retail, outcome = price, "retail<=preço"
+    discount = round((1 - price / retail) * 100) if retail > price else 0
+    if tx is None:
+        tx_text = f"n/d ({why})"
+    elif derived:
+        tx_text = f"derivada {tx:.6g} (preço/data-price-eur; currencies: {why})"
+    else:
+        tx_text = f"{tx} (currencies)"
+    debug = (f"moeda={currency or 'n/d'}; meta_preço={pm.get('content', 'n/d')}; data-price-eur={pm.get('data-price-eur', 'n/d')}; "
+             f"model: price={_raw(model.get('price'))} retail={_raw(model.get('retail'))} discount={_raw(model.get('discount'))}; "
+             f"tx={tx_text}; resultado: {outcome}")
+    return price, retail, discount, debug
 
 
 def _title_parts(og_title: str | None, seo_name: str) -> tuple[str, str]:
@@ -155,7 +186,11 @@ def parse_product_page(html: str, game_id: int, seo_name: str) -> Game:
 
 
 def parse_product_page_ex(html: str, game_id: int, seo_name: str) -> tuple[Game, str]:
-    """(jogo, origem do preço). A página mostra a moeda do visitante: nunca devolve números que não sejam EUR."""
+    return parse_product_page_full(html, game_id, seo_name)[:2]
+
+
+def parse_product_page_full(html: str, game_id: int, seo_name: str) -> tuple[Game, str, str]:
+    """(jogo, origem do preço, diagnóstico). A página mostra a moeda do visitante: nunca devolve números que não sejam EUR."""
     model = scrape.extract_window_json(html, "productModel")
     if not isinstance(model, dict):
         raise scrape.ScrapeError("window.productModel ausente na página do jogo")
@@ -177,11 +212,11 @@ def parse_product_page_ex(html: str, game_id: int, seo_name: str) -> tuple[Game,
         except (KeyError, ValueError, TypeError) as e:
             raise scrape.ScrapeError("productModel sem preço válido") from e
         source = "página EUR"
+        debug = (f"moeda=EUR; model: price={_raw(model.get('price'))} retail={_raw(model.get('retail'))} "
+                 f"discount={_raw(model.get('discount'))}; resultado: página em EUR")
     else:
-        # moeda desconhecida ou não-EUR: retail/desconto não são fiáveis
-        price = _eur_price_from_page(html, currency, _to_float(model.get("price"))) if currency else 0.0
-        retail = _eur_retail_from_visitor(html, currency, model.get("retail"), price) if price > 0 else price
-        discount = round((1 - price / retail) * 100) if retail > price else 0
+        # moeda desconhecida ou não-EUR: o desconto da página não é fiável (é recalculado)
+        price, retail, discount, debug = _non_eur_prices(html, currency, model)
         source = "página convertida" if price > 0 else "página sem preço"
     image = _meta_content(html, "og:image") or ""
     v = re.search(r"[?&]v=(\d+)", image)
@@ -202,7 +237,7 @@ def parse_product_page_ex(html: str, game_id: int, seo_name: str) -> tuple[Game,
         store=store,
         retail_known=currency == "EUR",
     )
-    return game, source
+    return game, source, debug
 
 
 def fetch_product_page(url: str, session=None) -> str:
@@ -217,30 +252,35 @@ def fetch_product_page(url: str, session=None) -> str:
     return resp.text
 
 
-def resolve_ex(path: Path, fetch=fetch_product_page, pool: list[Game] | None = None,
-               sources: dict[int, str] | None = None) -> tuple[Game | None, str, list[str], str]:
+def resolve_full(path: Path, fetch=fetch_product_page, pool: list[Game] | None = None,
+                 sources: dict[int, str] | None = None) -> tuple[Game | None, str, list[str], str, str]:
     """Nunca levanta: qualquer falha vira um aviso genérico (sem URLs nem detalhes de rede).
 
     Se o jogo estiver na `pool` (listas, em EUR) usa esses dados e não pede a página.
-    O último valor é a origem do preço (para o registo da execução)."""
+    Devolve (jogo, nota, avisos, origem do preço, diagnóstico; este só vem de páginas de produto)."""
     try:
         pick = load_pick(path)
         if pick is None:
-            return None, "", [], ""
+            return None, "", [], "", ""
         game_id, slug = parse_pick_url(pick["url"])
         note = _clean_note(pick["note"])
         for g in pool or []:
             if g.id == game_id:
-                return replace(g, rank=0), note, [], (sources or {}).get(game_id, "lista EUR")
+                return replace(g, rank=0), note, [], (sources or {}).get(game_id, "lista EUR"), ""
         canonical = f"https://www.instant-gaming.com/pt/{game_id}-comprar-{slug}/"
-        game, source = parse_product_page_ex(fetch(canonical), game_id, slug)
-        return game, note, [], source
+        game, source, debug = parse_product_page_full(fetch(canonical), game_id, slug)
+        return game, note, [], source, debug
     except Exception:  # noqa: BLE001 - a escolha manual nunca pode derrubar a execução semanal
-        return None, "", [_WARNING], ""
+        return None, "", [_WARNING], "", ""
+
+
+def resolve_ex(path: Path, fetch=fetch_product_page, pool: list[Game] | None = None,
+               sources: dict[int, str] | None = None) -> tuple[Game | None, str, list[str], str]:
+    return resolve_full(path, fetch, pool, sources)[:4]
 
 
 def resolve(path: Path, fetch=fetch_product_page, pool: list[Game] | None = None) -> tuple[Game | None, str, list[str]]:
-    return resolve_ex(path, fetch, pool)[:3]
+    return resolve_full(path, fetch, pool)[:3]
 
 
 def cli(argv: list[str] | None = None) -> int:

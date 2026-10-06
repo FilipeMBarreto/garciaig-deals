@@ -418,8 +418,6 @@ def test_non_eur_page_with_rate_below_one_keeps_conservative_behaviour():
 
 
 def test_non_eur_page_without_rate_or_retail_keeps_conservative_behaviour():
-    g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 78, extra=""), 21378, "s")
-    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
     g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 0), 21378, "s")
     assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
 
@@ -427,3 +425,71 @@ def test_non_eur_page_without_rate_or_retail_keeps_conservative_behaviour():
 def test_non_eur_retail_not_above_price_means_no_discount():
     g, _ = streamer.parse_product_page_ex(usd_page(49.19, 55.04, 55), 21378, "s")  # 55 / 1.1189 = 49 <= 49.19
     assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0)
+
+
+# ---------- diagnóstico e robustez ----------
+
+def full(html):
+    return streamer.parse_product_page_full(html, 21378, "s")
+
+
+def test_debug_for_eur_page():
+    g, source, debug = full(page(model=GEARS_MODEL_EUR, currency_meta=(
+        '<meta itemprop="priceCurrency" content="EUR" /><meta itemprop="price" content="49.19" data-price-eur="49.19" />')))
+    assert source == "página EUR"
+    assert "moeda=EUR" in debug and "retail=70" in debug and "resultado: página em EUR" in debug
+
+
+def test_debug_for_usd_convertible_page():
+    g, source, debug = full(usd_page(49.19, 55.04, 78))
+    assert (g.retail, g.discount) == (70.0, 30)
+    for part in ("moeda=USD", "meta_preço=55.04", "data-price-eur=49.19", "price='55.04'(str)", "retail=78(int)",
+                 "discount=25(int)", "tx=1.118943771 (currencies)", "resultado: retail convertido 78→70"):
+        assert part in debug, part
+    assert "http" not in debug and "cookie" not in debug.lower()
+
+
+def test_debug_for_gbp_page_rate_below_one():
+    g, _, debug = full(usd_page(49.19, 41.7, 59, currency="GBP"))
+    assert g.retail == g.price and "tx=0.847877 (currencies)" in debug and "resultado: taxa<1" in debug
+
+
+def test_missing_currencies_derives_rate_from_price_ratio():
+    g, source, debug = full(usd_page(49.19, 55.04, 78, extra=""))
+    assert (g.price, g.retail, g.discount) == (49.19, 70.0, 30) and source == "página convertida"
+    assert "tx=derivada" in debug and "currencies ausente" in debug and "retail convertido 78→70" in debug
+
+
+def test_no_rate_at_all_has_no_retail():
+    html = usd_page(49.19, 55.04, 78, extra="").replace(' data-price-eur="49.19"', "")
+    g, source, debug = full(html)
+    assert g.price == 0.0 and source == "página sem preço" and "tx=n/d" in debug
+
+
+@pytest.mark.parametrize("extra,why", [
+    ("<script>window.currencies = {broken json;</script>", "JSON inválido"),
+    ('<script>window.currencies = {"EUR": {"tx": 1}};</script>', "moeda ausente em currencies"),
+    ('<script>window.currencies = {"USD": {"rate": 2}};</script>', "tx inválido"),
+    ('<script>window.currencies = [1, 2];</script>', "moeda ausente em currencies"),
+])
+def test_malformed_currencies_degrades_without_breaking(extra, why):
+    g, source, debug = full(usd_page(49.19, 55.04, 78, extra=extra))
+    assert g.price == 49.19 and source == "página convertida"
+    assert why in debug  # e a taxa derivada ainda permite converter o retail
+    assert g.retail == 70.0
+
+
+def test_retail_as_string_float_and_lowercase_currency():
+    html = usd_page(49.19, 55.04, '"78.0"', currency="usd")
+    g, _, debug = full(html)
+    assert g.retail == 70.0 and "moeda=USD" in debug
+    g, _, debug = full(usd_page(49.19, 55.04, "null"))
+    assert g.retail == g.price and "retail ausente" in debug
+
+
+def test_resolve_full_returns_debug_only_for_page_source(tmp_path):
+    p = write_pick(tmp_path)
+    *_, source, debug = streamer.resolve_full(p, lambda u: usd_page(49.19, 55.04, 78))
+    assert source == "página convertida" and "retail convertido" in debug
+    *_, source, debug = streamer.resolve_full(p, lambda u: pytest.fail("não"), pool=[pool_game()])
+    assert source == "lista EUR" and debug == ""

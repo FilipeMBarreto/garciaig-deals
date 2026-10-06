@@ -46,5 +46,6 @@ class Week:
     trending: list[Game] = field(default_factory=list)
     discounts: list[Game] = field(default_factory=list)
     streamer_source: str = ""  # de onde veio o preço do streamer (lista EUR, página EUR, ...)
+    streamer_debug: str = ""  # diagnóstico da conversão de preços da página do streamer
     retail_unknown: int = 0  # jogos da recolha sem preço original em euros
     pool_size: int = 0

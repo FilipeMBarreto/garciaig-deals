@@ -52,6 +52,7 @@ def _week_dict(w: Week) -> dict:
         "streamer": _game_dict(w.streamer),
         "streamer_note": w.streamer_note,
         "streamer_source": w.streamer_source,
+        "streamer_debug": w.streamer_debug,
         "retail_unknown": w.retail_unknown,
         "pool_size": w.pool_size,
         "trending": [_game_dict(g) for g in w.trending],
@@ -77,6 +78,7 @@ def _week_from_dict(d: dict) -> Week:
         streamer=_game_from_dict(d.get("streamer")),
         streamer_note=d.get("streamer_note", ""),
         streamer_source=d.get("streamer_source", ""),
+        streamer_debug=d.get("streamer_debug", ""),
         retail_unknown=d.get("retail_unknown", 0),
         pool_size=d.get("pool_size", 0),
         trending=[_game_from_dict(g) for g in d.get("trending", [])],
@@ -100,11 +102,11 @@ def run(today: date, *, offline_dir: Path | None, data_dir: Path, out_dir: Path,
     hist = history.load(data_dir / "history.json")
     key = select.week_key(today)
     # fetch_pick=None -> streamer.fetch_product_page (resolvido na chamada)
-    pick, pick_note, pick_warnings, pick_source = streamer.resolve_ex(
+    pick, pick_note, pick_warnings, pick_source, pick_debug = streamer.resolve_full(
         pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page, pool=pool)
     week = select.select_week(pool, history.recent_ids(hist, key), history.preorder_ids(hist), today,
                               exclude_games=[pick] if pick else [])
-    week.streamer, week.streamer_note, week.streamer_source = pick, pick_note, pick_source
+    week.streamer, week.streamer_note, week.streamer_source, week.streamer_debug = pick, pick_note, pick_source, pick_debug
     week.retail_unknown, week.pool_size = sum(not g.retail_known for g in pool), len(pool)
     if week.retail_unknown * 2 > week.pool_size:
         week.warnings.append("Preços originais indisponíveis para mais de metade dos jogos.")
@@ -149,9 +151,12 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
     if week.streamer:
         saved_pool.append(week.streamer)
         sources[week.streamer.id] = week.streamer_source or "lista EUR"
-    week.streamer, week.streamer_note, pick_warnings, week.streamer_source = streamer.resolve_ex(
+    old_streamer, old_debug = week.streamer, week.streamer_debug
+    week.streamer, week.streamer_note, pick_warnings, week.streamer_source, week.streamer_debug = streamer.resolve_full(
         pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page, pool=saved_pool, sources=sources)
     week.warnings.extend(pick_warnings)
+    if week.streamer and old_streamer and week.streamer.id == old_streamer.id and not week.streamer_debug:
+        week.streamer_debug = old_debug  # mesmo jogo reaproveitado da semana guardada: mantém o diagnóstico
     if week.streamer:
         # o jogo escolhido não pode repetir-se na página: sai das tendências e dos escalões
         # (os blocos podem ficar com menos de 4 jogos; nada é reposto sem nova recolha)
@@ -195,6 +200,8 @@ def cli(argv: list[str] | None = None) -> int:
     print(f"  próximos lançamentos: {len(week.upcoming)} jogos" + "".join(f"\n    - {g.name} ({g.store or 'loja n/d'}, {g.release_date})" for g in week.upcoming))
     if week.streamer:
         print(f"  destaque do streamer: {week.streamer.name!r} (preço: {week.streamer_source})")
+        if week.streamer_debug:
+            print(f"  diagnóstico streamer: {week.streamer_debug}")
     if week.retail_unknown:
         print(f"  preços originais em euros indisponíveis: {week.retail_unknown} de {week.pool_size} jogos")
     print(f"  tendências: {len(week.trending)} jogos")

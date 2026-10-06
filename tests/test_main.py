@@ -154,8 +154,8 @@ def test_republish_updates_only_streamer(tmp_path, monkeypatch):
     assert (data / "history.json").read_bytes() == hist_before
     assert out.featured == first.featured and out.upcoming == first.upcoming and out.tiers == first.tiers
     after = json.loads(read(tmp_path, "data/week.json"))
-    assert {k: v for k, v in after.items() if k not in ("streamer", "streamer_note", "streamer_source")} == \
-           {k: v for k, v in week_before.items() if k not in ("streamer", "streamer_note", "streamer_source")}
+    assert {k: v for k, v in after.items() if k not in ("streamer", "streamer_note", "streamer_source", "streamer_debug")} == \
+           {k: v for k, v in week_before.items() if k not in ("streamer", "streamer_note", "streamer_source", "streamer_debug")}
     html = read(tmp_path, "site/index.html")
     assert "Destaque do Streamer" in html and "novo comentário" in html and "Outro Jogo" in html
     payload = json.loads(read(tmp_path, "data/discord_payload.json"))
@@ -615,3 +615,25 @@ def test_cli_falls_back_to_full_run_on_version_mismatch(tmp_path, capsys):
     assert "week.json de outra versão; a fazer execução completa." in out
     new = json.loads(read(tmp_path, "data/week.json"))
     assert new["schema"] == main.WEEK_SCHEMA and new["featured"]["retail"] != 999.0
+
+
+def test_cli_prints_streamer_debug_line_only_for_page_source(tmp_path, capsys, monkeypatch):
+    (tmp_path / "data").mkdir()
+    streamer.save_pick(tmp_path / "data" / "streamer_pick.json", PICK_URL, "x")
+    monkeypatch.setattr(streamer, "fetch_product_page", lambda url: pick_page())
+    assert main.cli(cli_args(tmp_path)) == 0
+    out = capsys.readouterr().out
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    assert "  diagnóstico streamer: " in out and saved["streamer_debug"].startswith("moeda=EUR")
+    assert out.index("destaque do streamer") < out.index("diagnóstico streamer")
+
+
+def test_no_debug_line_when_pick_comes_from_lists(tmp_path, capsys):
+    base = tmp_path / "b"
+    (base / "data").mkdir(parents=True)
+    top = run_pick(base).trending[0]
+    (tmp_path / "data").mkdir()
+    _pick_for(tmp_path, top)
+    assert main.cli(cli_args(tmp_path)) == 0
+    assert "diagnóstico streamer" not in capsys.readouterr().out
+    assert json.loads(read(tmp_path, "data/week.json"))["streamer_debug"] == ""
