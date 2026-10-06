@@ -233,21 +233,21 @@
   },
   "warnings": [],
   "streamer": {
-    "id": 16809,
-    "name": "Call of Duty: Modern Warfare 4",
-    "seo_name": "call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store",
-    "price": 64.89,
-    "retail": 90.0,
-    "discount": 28,
+    "id": 22979,
+    "name": "Gears of War: E-Day Premium Edition",
+    "seo_name": "gears-of-war-e-day-premium-edition-pc-xbox-series-x-s-microsoft-store",
+    "price": 78.31,
+    "retail": 112.0,
+    "discount": 30,
     "avail_date": null,
     "preorder": false,
     "is_dlc": false,
     "is_pc": true,
-    "updated_at": 1790344291,
+    "updated_at": 1791280030,
     "rank": 0,
     "store": "Microsoft Store",
     "release_date": null,
-    "url": "https://www.instant-gaming.com/pt/16809-comprar-call-of-duty-modern-warfare-4-xbox-series-x-s-pc-microsoft-store/?igr=garciap"
+    "url": "https://www.instant-gaming.com/pt/22979-comprar-gears-of-war-e-day-premium-edition-pc-xbox-series-x-s-microsoft-store/?igr=garciap"
   },
   "streamer_note": "",
   "trending": [
@@ -267,23 +267,6 @@
       "store": "EA App",
       "release_date": "2026-09-25",
       "url": "https://www.instant-gaming.com/pt/21656-comprar-ea-sports-fc-27-pc-ea-app/?igr=garciap"
-    },
-    {
-      "id": 9572,
-      "name": "Gears of War: E-Day",
-      "seo_name": "gears-of-war-e-day-pc-xbox-series-x-s-microsoft-store",
-      "price": 49.19,
-      "retail": 78.31,
-      "discount": 30,
-      "avail_date": 1791244800,
-      "preorder": false,
-      "is_dlc": false,
-      "is_pc": true,
-      "updated_at": 1791277830,
-      "rank": 3,
-      "store": "Microsoft Store",
-      "release_date": "2026-10-06",
-      "url": "https://www.instant-gaming.com/pt/9572-comprar-gears-of-war-e-day-pc-xbox-series-x-s-microsoft-store/?igr=garciap"
     },
     {
       "id": 19382,
