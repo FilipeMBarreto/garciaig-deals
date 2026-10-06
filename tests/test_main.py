@@ -576,3 +576,42 @@ def test_few_unknown_retail_prints_line_but_no_warning(tmp_path, monkeypatch, ca
     saved = json.loads(read(tmp_path, "data/week.json"))
     assert "preços originais em euros indisponíveis:" in out
     assert not any("Preços originais" in w for w in saved["warnings"])
+
+
+# ---------- versão do week.json ----------
+
+def test_week_json_has_schema_version(tmp_path):
+    (tmp_path / "data").mkdir()
+    run_pick(tmp_path)
+    assert json.loads(read(tmp_path, "data/week.json"))["schema"] == main.WEEK_SCHEMA == 3
+    assert main._week_dict(main._week_from_dict(json.loads(read(tmp_path, "data/week.json"))))["schema"] == main.WEEK_SCHEMA
+
+
+@pytest.mark.parametrize("schema", ["missing", main.WEEK_SCHEMA - 1, main.WEEK_SCHEMA + 1, "3"])
+def test_republish_rejects_week_json_from_another_version(tmp_path, monkeypatch, schema):
+    data = tmp_path / "data"
+    data.mkdir()
+    run_pick(tmp_path)
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    if schema == "missing":
+        del saved["schema"]
+    else:
+        saved["schema"] = schema
+    (data / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    no_fetch_all(monkeypatch)
+    with pytest.raises(main.NoSavedWeek):
+        main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="")
+
+
+def test_cli_falls_back_to_full_run_on_version_mismatch(tmp_path, capsys):
+    assert main.cli(cli_args(tmp_path)) == 0
+    saved = json.loads(read(tmp_path, "data/week.json"))
+    del saved["schema"]
+    saved["featured"]["retail"] = 999.0  # dados antigos que não podem ser reutilizados
+    (tmp_path / "data" / "week.json").write_text(json.dumps(saved), encoding="utf-8")
+    capsys.readouterr()
+    assert main.cli(cli_args(tmp_path, "--republish")) == 0
+    out = capsys.readouterr().out
+    assert "week.json de outra versão; a fazer execução completa." in out
+    new = json.loads(read(tmp_path, "data/week.json"))
+    assert new["schema"] == main.WEEK_SCHEMA and new["featured"]["retail"] != 999.0

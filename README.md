@@ -26,7 +26,7 @@ Um jogo escolhido à mão aparece num cartão grande no topo do site (sem títul
 
 **Pelo GitHub:** Actions → "Atualização semanal" → *Run workflow* → preencher o link do jogo na Instant Gaming (`https://www.instant-gaming.com/pt/NÚMERO-comprar-nome/`) e, se quiser, o comentário (até 280 caracteres). Para tirar o destaque, marcar "Remover o destaque do streamer".
 - Só quem tem permissão de escrita no repositório pode executar o workflow; o controlo de acesso é essa permissão do GitHub. Um URL "secreto" não protegeria nada num repositório público.
-- Esta execução **só republica o site**: não envia nada para o Discord e não volta a sortear os restantes blocos (usa a semana já guardada em `data/week.json`; se ainda não existir para esta semana, faz uma execução completa, também sem Discord).
+- Esta execução **só republica o site**: não envia nada para o Discord e não volta a sortear os restantes blocos (usa a semana já guardada em `data/week.json`; se ainda não existir para esta semana, ou se foi gerada por outra versão do código (campo `schema`), faz uma execução completa, também sem Discord).
 - A escolha fica guardada em `data/streamer_pick.json` (é gravada no repositório) e mantém-se nas execuções seguintes até ser alterada ou removida.
 - Uma execução do formulário só com comentário e sem link é ignorada (faz uma execução completa normal). A escolha não é deduplicada face aos jogos do destaque semanal nem dos blocos de preço: pode repetir-se.
 - Duas execuções manuais lançadas em simultâneo podem ser fundidas pela configuração de concorrência do GitHub: lance-as uma de cada vez.

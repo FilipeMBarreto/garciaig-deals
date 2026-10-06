@@ -13,12 +13,21 @@ from .models import Game, Week
 ROOT = Path(__file__).resolve().parents[2]
 
 
+# Versão do conteúdo de data/week.json. Subir sempre que mudar o formato/semântica do ficheiro
+# ou a lógica de seleção/preços: o --republish recusa ficheiros de outra versão (faz execução completa).
+WEEK_SCHEMA = 3
+
+
 class PipelineError(RuntimeError):
     pass
 
 
 class NoSavedWeek(PipelineError):
     """Não há data/week.json para a semana pedida: não dá para republicar só o destaque do streamer."""
+
+
+class SchemaMismatch(NoSavedWeek):
+    """week.json guardado por outra versão do código: não é seguro reutilizá-lo."""
 
 
 def _game_dict(g: Game | None) -> dict | None:
@@ -32,6 +41,7 @@ def _game_dict(g: Game | None) -> dict | None:
 
 def _week_dict(w: Week) -> dict:
     return {
+        "schema": WEEK_SCHEMA,
         "week": w.key,
         "start": w.start.isoformat(),
         "end": w.end.isoformat(),
@@ -120,12 +130,14 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
     data_dir = Path(data_dir)
     try:
         saved = json.loads((data_dir / "week.json").read_text(encoding="utf-8"))
+        if saved.get("schema") != WEEK_SCHEMA:
+            raise SchemaMismatch("week.json de outra versão.")
         if saved["week"] != select.week_key(today):
             raise NoSavedWeek("A semana guardada é de outra semana.")
         if "trending" not in saved or "discounts" not in saved or "upcoming" not in saved:
             raise NoSavedWeek("A semana guardada é de uma versão antiga (sem tendências).")
         week = _week_from_dict(saved)
-    except NoSavedWeek:
+    except (NoSavedWeek, SchemaMismatch):
         raise
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise NoSavedWeek("Sem semana guardada utilizável.") from e
@@ -170,6 +182,8 @@ def cli(argv: list[str] | None = None) -> int:
             try:
                 week = republish(a.today, data_dir=a.data_dir, out_dir=a.out_dir, site_url=a.site_url)
                 print("Republicação: só o destaque do streamer foi atualizado.")
+            except SchemaMismatch:
+                print("week.json de outra versão; a fazer execução completa.")
             except NoSavedWeek:
                 print("Sem semana guardada para esta semana; a fazer execução completa.")
         if week is None:
