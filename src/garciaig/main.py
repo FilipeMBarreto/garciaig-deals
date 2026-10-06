@@ -41,6 +41,7 @@ def _week_dict(w: Week) -> dict:
         "warnings": w.warnings,
         "streamer": _game_dict(w.streamer),
         "streamer_note": w.streamer_note,
+        "streamer_source": w.streamer_source,
         "trending": [_game_dict(g) for g in w.trending],
         "discounts": [_game_dict(g) for g in w.discounts],
     }
@@ -63,6 +64,7 @@ def _week_from_dict(d: dict) -> Week:
         warnings=list(d.get("warnings", [])),
         streamer=_game_from_dict(d.get("streamer")),
         streamer_note=d.get("streamer_note", ""),
+        streamer_source=d.get("streamer_source", ""),
         trending=[_game_from_dict(g) for g in d.get("trending", [])],
         discounts=[_game_from_dict(g) for g in d.get("discounts", [])],
     )
@@ -84,11 +86,11 @@ def run(today: date, *, offline_dir: Path | None, data_dir: Path, out_dir: Path,
     hist = history.load(data_dir / "history.json")
     key = select.week_key(today)
     # fetch_pick=None -> streamer.fetch_product_page (resolvido na chamada)
-    pick, pick_note, pick_warnings = streamer.resolve(
-        pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page)
+    pick, pick_note, pick_warnings, pick_source = streamer.resolve_ex(
+        pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page, pool=pool)
     week = select.select_week(pool, history.recent_ids(hist, key), history.preorder_ids(hist), today,
                               exclude_games=[pick] if pick else [])
-    week.streamer, week.streamer_note = pick, pick_note
+    week.streamer, week.streamer_note, week.streamer_source = pick, pick_note, pick_source
     week.warnings.extend(pick_warnings)
 
     if week.featured is None:
@@ -121,8 +123,15 @@ def republish(today: date, *, data_dir: Path, out_dir: Path, site_url: str,
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise NoSavedWeek("Sem semana guardada utilizável.") from e
     week.warnings = [w for w in week.warnings if not w.startswith(STREAMER_WARNING_PREFIX)]
-    week.streamer, week.streamer_note, pick_warnings = streamer.resolve(
-        pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page)
+    # sem as listas: usa os jogos (EUR) da semana guardada; o streamer anterior mantém a sua origem de preço
+    saved_pool = [g for g in (week.featured, *week.upcoming, *week.trending, *week.discounts,
+                              *(g for games in week.tiers.values() for g in games)) if g]
+    sources = {}
+    if week.streamer:
+        saved_pool.append(week.streamer)
+        sources[week.streamer.id] = week.streamer_source or "lista EUR"
+    week.streamer, week.streamer_note, pick_warnings, week.streamer_source = streamer.resolve_ex(
+        pick_path or data_dir / "streamer_pick.json", fetch_pick or streamer.fetch_product_page, pool=saved_pool, sources=sources)
     week.warnings.extend(pick_warnings)
     if week.streamer:
         # o jogo escolhido não pode repetir-se na página: sai das tendências e dos escalões
@@ -164,7 +173,7 @@ def cli(argv: list[str] | None = None) -> int:
     print(f"Semana {week.key}: destaque={week.featured.name!r}")
     print(f"  próximos lançamentos: {len(week.upcoming)} jogos" + "".join(f"\n    - {g.name} ({g.store or 'loja n/d'}, {g.release_date})" for g in week.upcoming))
     if week.streamer:
-        print(f"  destaque do streamer: {week.streamer.name!r}")
+        print(f"  destaque do streamer: {week.streamer.name!r} (preço: {week.streamer_source})")
     print(f"  tendências: {len(week.trending)} jogos")
     print(f"  maiores descontos: {len(week.discounts)} jogos" + "".join(f"\n    - {g.name} (-{g.discount} %)" for g in week.discounts))
     for key, games in week.tiers.items():

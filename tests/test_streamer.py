@@ -88,9 +88,14 @@ def test_load_pick_malformed_raises_value_error(tmp_path, content):
 
 # ---------- parse_product_page ----------
 
+EUR_META = ('<meta itemprop="priceCurrency" content="EUR" />'
+            '<meta itemprop="price" content="24.99" data-price-eur="24.99" />')
+
+
 def page(title='Comprar Transport Fever 3 - Deluxe Edition - PC (Steam) - Europe', image="https://gaming-cdn.com/images/products/21378/380x218/21378-cover.jpg?v=1790779184",
-         model='{"prod_id": 21378, "price": "24.99", "retail": "49.99", "discount": 50, "preorder": false}'):
-    parts = ["<html><head>"]
+         model='{"prod_id": 21378, "price": "24.99", "retail": "49.99", "discount": 50, "preorder": false}',
+         currency_meta=EUR_META, extra=""):
+    parts = ["<html><head>", currency_meta]
     if title is not None:
         parts.append(f'<meta property="og:title" content="{title}">')
     if image is not None:
@@ -98,6 +103,7 @@ def page(title='Comprar Transport Fever 3 - Deluxe Edition - PC (Steam) - Europe
     parts.append("</head><body>")
     if model is not None:
         parts.append(f"<script>window.productModel = {model};</script>")
+    parts.append(extra)
     parts.append("</body></html>")
     return "\n".join(parts)
 
@@ -316,3 +322,69 @@ def test_real_og_titles(title, expected):
 def test_store_empty_when_title_unmatched():
     assert streamer.parse_product_page(page(title=None), 21378, "x").store == ""
     assert streamer.parse_product_page(page(title="Qualquer coisa"), 21378, "x").store == ""
+
+
+# ---------- moeda do preço (a página adapta-se à moeda do visitante) ----------
+
+GEARS_MODEL_EUR = '{"prod_id": 21378, "price": "49.19", "retail": 70, "discount": 30, "preorder": true}'
+GEARS_MODEL_USD = '{"prod_id": 21378, "price": "55.04", "retail": 78, "discount": 25, "preorder": true}'
+CURRENCIES = '<script>window.currencies = {"EUR": {"tx": 1}, "USD": {"tx": "1.118943771"}};</script>'
+
+
+def test_page_eur_uses_product_model():
+    meta = '<meta itemprop="priceCurrency" content="EUR" /><meta itemprop="price" content="49.19" data-price-eur="49.19" />'
+    g, source = streamer.parse_product_page_ex(page(model=GEARS_MODEL_EUR, currency_meta=meta), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 70.0, 30) and source == "página EUR"
+
+
+def test_page_usd_uses_data_price_eur_and_drops_retail_and_discount():
+    meta = '<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" data-price-eur="49.19" />'
+    html = page(model=GEARS_MODEL_USD, currency_meta=meta, extra='<span data-price-eur="1.23"></span>' + CURRENCIES)
+    g, source = streamer.parse_product_page_ex(html, 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0) and source == "página convertida"
+    assert streamer.parse_product_page(html, 21378, "s") == g
+
+
+def test_page_usd_without_data_price_eur_converts_with_currency_rate():
+    meta = '<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" />'
+    g, source = streamer.parse_product_page_ex(page(model=GEARS_MODEL_USD, currency_meta=meta, extra=CURRENCIES), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (49.19, 49.19, 0) and source == "página convertida"
+
+
+@pytest.mark.parametrize("meta,extra", [
+    ('<meta itemprop="priceCurrency" content="USD" /><meta itemprop="price" content="55.04" />', ""),
+    ('<meta itemprop="priceCurrency" content="GBP" /><meta itemprop="price" content="40" />', CURRENCIES),
+    ("", ""),  # sem meta de moeda: não dá para saber -> nunca arriscar
+])
+def test_page_non_eur_without_conversion_gives_zero_price(meta, extra):
+    g, source = streamer.parse_product_page_ex(page(model=GEARS_MODEL_USD, currency_meta=meta, extra=extra), 21378, "s")
+    assert (g.price, g.retail, g.discount) == (0.0, 0.0, 0) and source == "página sem preço"
+
+
+def pool_game(**kw):
+    from garciaig.models import Game
+    base = dict(id=21378, name="Gears of War: E-Day", seo_name="gears-pc", price=49.19, retail=70.0, discount=30,
+                avail_date=1791244800, preorder=True, is_dlc=False, is_pc=True, updated_at=5, rank=3, store="Microsoft Store")
+    base.update(kw)
+    return Game(**base)
+
+
+def test_resolve_prefers_pool_and_never_fetches(tmp_path):
+    p = write_pick(tmp_path, "nota")
+
+    def boom(url):
+        raise AssertionError("não devia ir buscar a página")
+
+    g, note, warns, source = streamer.resolve_ex(p, boom, pool=[pool_game(id=1), pool_game()])
+    assert (g.price, g.retail, g.discount, g.store, g.rank, g.name) == (49.19, 70.0, 30, "Microsoft Store", 0, "Gears of War: E-Day")
+    assert note == "nota" and warns == [] and source == "lista EUR"
+    assert streamer.resolve(p, boom, pool=[pool_game()])[0].price == 49.19
+
+
+def test_resolve_pool_source_override_and_miss_uses_fetch(tmp_path):
+    p = write_pick(tmp_path)
+    _, _, _, source = streamer.resolve_ex(p, lambda u: pytest.fail("não"), pool=[pool_game()], sources={21378: "página convertida"})
+    assert source == "página convertida"
+    seen = []
+    g, _, warns, source = streamer.resolve_ex(p, lambda u: seen.append(u) or page(), pool=[pool_game(id=999)])
+    assert seen == [GOOD] and g.price == 24.99 and source == "página EUR" and warns == []

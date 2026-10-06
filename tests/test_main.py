@@ -61,6 +61,8 @@ PICK_URL = "https://www.instant-gaming.com/pt/777-comprar-pick-game-pc-steam/"
 
 def pick_page(name="Pick Game", price="9.99"):
     return (
+        '<meta itemprop="priceCurrency" content="EUR" />'
+        f'<meta itemprop="price" content="{price}" data-price-eur="{price}" />'
         f'<meta property="og:title" content="Comprar {name} - PC (Steam) - Europe">'
         '<meta property="og:image" content="https://gaming-cdn.com/images/products/777/380x218/777-cover.jpg?v=42">'
         f'<script>window.productModel = {{"prod_id": 777, "price": "{price}", "retail": "19.99", "discount": 50, "preorder": false}};</script>'
@@ -152,8 +154,8 @@ def test_republish_updates_only_streamer(tmp_path, monkeypatch):
     assert (data / "history.json").read_bytes() == hist_before
     assert out.featured == first.featured and out.upcoming == first.upcoming and out.tiers == first.tiers
     after = json.loads(read(tmp_path, "data/week.json"))
-    assert {k: v for k, v in after.items() if k not in ("streamer", "streamer_note")} == \
-           {k: v for k, v in week_before.items() if k not in ("streamer", "streamer_note")}
+    assert {k: v for k, v in after.items() if k not in ("streamer", "streamer_note", "streamer_source")} == \
+           {k: v for k, v in week_before.items() if k not in ("streamer", "streamer_note", "streamer_source")}
     html = read(tmp_path, "site/index.html")
     assert "Destaque do Streamer" in html and "novo comentário" in html and "Outro Jogo" in html
     payload = json.loads(read(tmp_path, "data/discord_payload.json"))
@@ -450,7 +452,7 @@ def test_republish_new_streamer_dropped_from_upcoming(tmp_path, monkeypatch):
                  f'<script>window.productModel = {{"prod_id": {v.id}, "price": "9.99", "retail": "9.99", "discount": 0, "preorder": true}};</script>')
     out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=lambda url: page_html)
     assert v.id not in {g.id for g in out.upcoming} and len(out.upcoming) == 3
-    assert out.streamer.store == "Steam"
+    assert out.streamer.store == v.store  # vem da lista guardada (EUR), sem pedir a página
 
 
 def test_week_from_dict_tolerates_games_without_store(tmp_path):
@@ -461,3 +463,60 @@ def test_week_from_dict_tolerates_games_without_store(tmp_path):
         g.pop("store", None)
     back = main._week_from_dict(d)
     assert back.featured.store == "" and back.upcoming[0].store == ""
+
+
+# ---------- Moeda do destaque do streamer ----------
+
+def _pick_for(tmp_path, game):
+    streamer.save_pick(tmp_path / "data" / "streamer_pick.json",
+                       f"https://www.instant-gaming.com/pt/{game.id}-comprar-{game.seo_name}/", "nota")
+
+
+def _never_fetch(url):
+    raise AssertionError("não devia ir buscar a página do jogo")
+
+
+def test_pick_in_lists_uses_eur_pool_price_without_fetching(tmp_path):
+    other = tmp_path / "base"
+    (other / "data").mkdir(parents=True)
+    top = run_pick(other).trending[0]
+    (tmp_path / "data").mkdir()
+    _pick_for(tmp_path, top)
+    week = main.run(TODAY, offline_dir=FIX, data_dir=tmp_path / "data", out_dir=tmp_path / "site", site_url="", dry_run=False,
+                    fetch_pick=_never_fetch)
+    assert week.streamer.id == top.id and week.streamer.price == top.price and week.streamer.retail == top.retail
+    assert week.streamer_source == "lista EUR"
+    assert top.id not in {g.id for g in week.trending}
+    assert json.loads(read(tmp_path, "data/week.json"))["streamer_source"] == "lista EUR"
+    from garciaig.fmt import fmt_price
+    assert fmt_price(top.price) in read(tmp_path, "site/index.html")
+
+
+def test_republish_reuses_saved_week_games_without_fetching(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    first = run_pick(tmp_path)
+    target = first.upcoming[0]
+    _pick_for(tmp_path, target)
+    no_fetch_all(monkeypatch)
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=_never_fetch)
+    assert out.streamer.id == target.id and out.streamer.price == target.price and out.streamer_source == "lista EUR"
+    assert target.id not in {g.id for g in out.upcoming}
+
+
+def test_republish_keeps_saved_streamer_data_and_source_for_same_pick(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    data.mkdir()
+    streamer.save_pick(data / "streamer_pick.json", PICK_URL, "nota")
+    first = run_pick(tmp_path)  # preço da página EUR
+    assert first.streamer.id == 777
+    no_fetch_all(monkeypatch)
+    out = main.republish(TODAY, data_dir=data, out_dir=tmp_path / "site", site_url="", fetch_pick=_never_fetch)
+    assert out.streamer == first.streamer and out.streamer_source == first.streamer_source
+
+
+def test_cli_prints_price_source(tmp_path, capsys, monkeypatch):
+    streamer.save_pick(tmp_path / "data" / "streamer_pick.json", PICK_URL, "x") if (tmp_path / "data").mkdir() is None else None
+    monkeypatch.setattr(streamer, "fetch_product_page", lambda url: pick_page())
+    assert main.cli(cli_args(tmp_path)) == 0
+    assert "(preço: página EUR)" in capsys.readouterr().out

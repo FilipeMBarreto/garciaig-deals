@@ -44,3 +44,4 @@ class Week:
     streamer_note: str = ""
     trending: list[Game] = field(default_factory=list)
     discounts: list[Game] = field(default_factory=list)
+    streamer_source: str = ""  # de onde veio o preço do streamer (lista EUR, página EUR, ...)
