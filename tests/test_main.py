@@ -248,7 +248,7 @@ def test_end_to_end_trending_block(tmp_path):
     hist = json.loads(read(tmp_path, "data/history.json"))
     assert not {g.id for g in week.trending} & {i for ids in hist["weeks"][0]["tiers"].values() for i in ids}
     html = read(tmp_path, "site/index.html")
-    assert html.index("Pré-venda da Próxima Semana") < html.index("Tendências do Momento") < html.index("Até 20 €")
+    assert html.index("Pré-venda") < html.index("Tendências") < html.index("Até 20 €")
 
 
 def test_streamer_pick_is_excluded_from_trending_and_tiers(tmp_path):
@@ -325,7 +325,7 @@ def test_end_to_end_discounts_block(tmp_path):
     hist = json.loads(read(tmp_path, "data/history.json"))
     assert hist["weeks"][0]["discounts"] == [g.id for g in week.discounts]
     html = read(tmp_path, "site/index.html")
-    assert html.index("Tendências do Momento") < html.index("Maiores Descontos") < html.index("Até 20 €")
+    assert html.index("Tendências") < html.index("Maiores Descontos") < html.index("Até 20 €")
 
 
 def test_cli_prints_discounts_count_and_names(tmp_path, capsys):

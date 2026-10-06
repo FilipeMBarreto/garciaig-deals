@@ -49,13 +49,13 @@
   </section>
 
   <section>
-    <h2>⏳ Pré-venda da Próxima Semana</h2>
+    <h2>⏳ Pré-venda</h2>
     {% if preorder %}{{ card(preorder, true) }}{% else %}<p class="empty">Sem pré-venda disponível.</p>{% endif %}
     {% for n in preorder_notes %}<p class="note">{{ n }}</p>{% endfor %}
   </section>
 
   <section>
-    <h2>🔥 Tendências do Momento{% if trending %} · {{ trending|length }} {{ 'jogo' if trending|length == 1 else 'jogos' }}{% endif %}</h2>
+    <h2>🔥 Tendências</h2>
     {% if trending %}
     <div class="grid">{% for g in trending %}{{ card(g) }}{% endfor %}</div>
     {% else %}
@@ -64,7 +64,7 @@
   </section>
 
   <section>
-    <h2>🏷️ Maiores Descontos{% if discounts %} · {{ discounts|length }} {{ 'jogo' if discounts|length == 1 else 'jogos' }}{% endif %}</h2>
+    <h2>🏷️ Maiores Descontos</h2>
     {% if discounts %}
     <div class="grid">{% for g in discounts %}{{ card(g, saving=true) }}{% endfor %}</div>
     {% else %}
@@ -74,7 +74,7 @@
 
   {% for title, games in tiers %}
   <section>
-    <h2>{{ title }}{% if games %} · {{ games|length }} {{ 'jogo' if games|length == 1 else 'jogos' }}{% endif %}</h2>
+    <h2>{{ title }}</h2>
     {% if games %}
     <div class="grid">{% for g in games %}{{ card(g) }}{% endfor %}</div>
     {% else %}

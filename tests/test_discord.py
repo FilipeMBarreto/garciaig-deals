@@ -86,7 +86,7 @@ def test_main_hides_webhook_secret_in_error(tmp_path, monkeypatch, capsys):
 
 def test_tier_title_singular_for_one_game():
     p = discord.build_payload(make_week())
-    assert any(e["title"] == "🎮 1 jogo até 20 €" for e in p["embeds"])
+    assert any(e["title"] == "💶 Até 20 €" for e in p["embeds"])
 
 
 def test_payload_disables_mentions():
@@ -144,9 +144,9 @@ def test_trending_embed_order_color_and_links():
     w.trending = [game(50 + i, f"Hot [{i}]", 12) for i in range(4)]
     p = discord.build_payload(w)
     titles = [e["title"] for e in p["embeds"]]
-    assert titles.index("🔥 Tendências do momento") == titles.index("⏳ Pré-venda da Próxima Semana") + 1
-    assert titles.index("🔥 Tendências do momento") < next(i for i, t in enumerate(titles) if "até 20" in t.lower())
-    e = p["embeds"][titles.index("🔥 Tendências do momento")]
+    assert titles.index("🔥 Tendências") == titles.index("⏳ Pré-venda") + 1
+    assert titles.index("🔥 Tendências") < next(i for i, t in enumerate(titles) if "até 20" in t.lower())
+    e = p["embeds"][titles.index("🔥 Tendências")]
     assert e["color"] == 0xEF4444 and e["description"].count("• [") == 4 and "Hot \\[0\\]" in e["description"]
     links = re.findall(r"\((https://www\.instant-gaming\.com[^)]*)\)", json.dumps(p, ensure_ascii=False))
     assert len(links) == 3 + 4 and all(l.endswith("?igr=garciap") for l in links)
@@ -162,8 +162,8 @@ def test_discounts_embed_order_percent_color_and_links():
     w.discounts = [Game(60 + i, f"Deal [{i}]", f"slug-{60 + i}", 10, 25, 60, 1791244800, False, False, True, 5, 0) for i in range(4)]
     p = discord.build_payload(w)
     titles = [e["title"] for e in p["embeds"]]
-    i = titles.index("🏷️ Maiores descontos")
-    assert i == titles.index("🔥 Tendências do momento") + 1
+    i = titles.index("🏷️ Maiores Descontos")
+    assert i == titles.index("🔥 Tendências") + 1
     assert i < next(k for k, t in enumerate(titles) if "até 20" in t.lower())
     e = p["embeds"][i]
     assert e["color"] == 0xF59E0B and e["description"].count("(-60 %)") == 4 and "10,00 €" in e["description"]

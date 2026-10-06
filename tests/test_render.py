@@ -56,13 +56,13 @@ def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
     assert '<p class="note">Sem candidato a destaque &lt;esta&gt; semana.</p>' in html
     assert "<esta>" not in html
     assert "só 0 de 4" not in html
-    assert html.index("Sem candidato a destaque") < html.index("Pré-venda da Próxima Semana") < html.index("Sem pré-venda para")
+    assert html.index("Sem candidato a destaque") < html.index("Pré-venda") < html.index("Sem pré-venda para")
 
 
 def test_render_heading_has_no_zero_jogos(tmp_path):
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "0 jogos" not in html
-    assert "<h2>Até 10 € · 1 jogo</h2>" in html and "<h2>Até 20 € · 1 jogo</h2>" in html
+    assert "<h2>Até 10 €</h2>" in html and "<h2>Até 20 €</h2>" in html
 
 
 def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
@@ -71,7 +71,7 @@ def test_streamer_section_first_with_badge_and_escaped_note(tmp_path):
     w.streamer_note = "Joguem <script>alert(1)</script> & divirtam-se"
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "🎙️ Destaque do Streamer" in html
-    assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Pré-venda da Próxima Semana")
+    assert html.index("Destaque do Streamer") < html.index("Destaque da Semana") < html.index("Pré-venda")
     assert "Escolha do streamer" in html and 'class="badge-streamer"' in html
     assert '<blockquote class="note-streamer">Joguem &lt;script&gt;alert(1)&lt;/script&gt; &amp; divirtam-se</blockquote>' in html
     assert "<script>" not in html and "Pick &lt;b&gt;Game&lt;/b&gt;" in html
@@ -111,8 +111,8 @@ def test_trending_section_between_preorder_and_first_tier(tmp_path):
     w = make_week()
     w.trending = [game(50 + i, f"Hot {i}", 12) for i in range(4)]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert "<h2>🔥 Tendências do Momento · 4 jogos</h2>" in html
-    assert html.index("Pré-venda da Próxima Semana") < html.index("Tendências do Momento") < html.index("Até 20 €")
+    assert "<h2>🔥 Tendências</h2>" in html
+    assert html.index("Pré-venda") < html.index("Tendências") < html.index("Até 20 €")
     assert "https://www.instant-gaming.com/pt/50-comprar-slug-50/?igr=garciap" in html
 
 
@@ -120,9 +120,9 @@ def test_trending_singular_and_empty(tmp_path):
     w = make_week()
     w.trending = [game(50, "Hot", 12)]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert "<h2>🔥 Tendências do Momento · 1 jogo</h2>" in html
+    assert "<h2>🔥 Tendências</h2>" in html
     html = render.render_site(make_week(), tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    start = html.index("Tendências do Momento")
+    start = html.index("Tendências")
     assert "Sem candidatos esta semana." in html[start:html.index("</section>", start)]
 
 
@@ -131,8 +131,8 @@ def test_discounts_section_order_saving_line_only_there_and_empty(tmp_path):
     w.trending = [game(50, "Hot", 12)]
     w.discounts = [game(60 + i, f"Deal {i}", 10) for i in range(4)]  # retail = 15 -> poupa 5,00 €
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
-    assert "<h2>🏷️ Maiores Descontos · 4 jogos</h2>" in html
-    assert html.index("Tendências do Momento") < html.index("Maiores Descontos") < html.index("Até 20 €")
+    assert "<h2>🏷️ Maiores Descontos</h2>" in html
+    assert html.index("Tendências") < html.index("Maiores Descontos") < html.index("Até 20 €")
     assert html.count("Poupas 5,00 €") == 4
     start = html.index("Maiores Descontos")
     assert html[start:html.index("</section>", start)].count("Poupas") == 4
@@ -155,3 +155,20 @@ def test_legacy_week_with_tier_5_renders_only_two_tiers(tmp_path):
     w.tiers["5"] = [game(99, "Legacy Cheap", 3)]
     html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
     assert "Legacy Cheap" not in html and "Até 5" not in html
+
+
+def test_no_count_text_in_site_headings_or_discord_titles(tmp_path):
+    from garciaig import discord
+    w = make_week()
+    w.trending = [game(50 + i, f"Hot {i}", 12) for i in range(4)]
+    w.discounts = [game(60 + i, f"Deal {i}", 10) for i in range(4)]
+    w.streamer = game(7, "Pick", 12)
+    html = render.render_site(w, tmp_path, date(2026, 10, 5)).read_text(encoding="utf-8")
+    heads = re.findall(r"<h2>(.*?)</h2>", html)
+    assert heads == ["🎙️ Destaque do Streamer", "⭐ Destaque da Semana", "⏳ Pré-venda", "🔥 Tendências",
+                     "🏷️ Maiores Descontos", "Até 20 €", "Até 10 €"]
+    assert not any("jogo" in h.lower() for h in heads)
+    titles = [e["title"] for e in discord.build_payload(w)["embeds"]]
+    assert titles == ["🎙️ Destaque do streamer", "⭐ Destaque da Semana", "⏳ Pré-venda", "🔥 Tendências",
+                      "🏷️ Maiores Descontos", "💶 Até 20 €", "💶 Até 10 €"]
+    assert not any("jogo" in t.lower() for t in titles)

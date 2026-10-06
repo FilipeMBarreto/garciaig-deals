@@ -43,16 +43,16 @@ def build_payload(week: Week, site_url: str = "") -> dict:
             "image": {"url": week.featured.cover_url},
         })
     if week.preorder:
-        embeds.append({"title": "⏳ Pré-venda da Próxima Semana", "description": _line(week.preorder), "color": 0x22D3EE})
+        embeds.append({"title": "⏳ Pré-venda", "description": _line(week.preorder), "color": 0x22D3EE})
     if week.trending:
         embeds.append({
-            "title": "🔥 Tendências do momento",
+            "title": "🔥 Tendências",
             "description": "\n".join(f"• {_line(g)}" for g in week.trending),
             "color": 0xEF4444,
         })
     if week.discounts:
         embeds.append({
-            "title": "🏷️ Maiores descontos",
+            "title": "🏷️ Maiores Descontos",
             "description": "\n".join(f"• {_line(g, True)}" for g in week.discounts),
             "color": 0xF59E0B,
         })
@@ -60,7 +60,7 @@ def build_payload(week: Week, site_url: str = "") -> dict:
         games = week.tiers.get(key) or []
         if games:
             embeds.append({
-                "title": f"🎮 {len(games)} {'jogo' if len(games) == 1 else 'jogos'} {TIER_TITLES[key].lower()}",
+                "title": f"💶 {TIER_TITLES[key]}",
                 "description": "\n".join(f"• {_line(g)}" for g in games),
                 "color": 0x34D399,
             })
