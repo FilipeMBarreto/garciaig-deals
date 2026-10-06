@@ -56,7 +56,7 @@ def test_render_shows_slot_warnings_escaped_and_hides_tier_warnings(tmp_path):
     assert '<p class="note">Sem candidato a destaque &lt;esta&gt; semana.</p>' in html
     assert "<esta>" not in html
     assert "só 0 de 4" not in html
-    assert html.index("Sem candidato a destaque") < html.index("Pré-venda") < html.index("Sem pré-venda para")
+    assert html.index("Sem candidato a destaque") < html.index("<h2>⏳ Pré-venda</h2>") < html.index("Sem pré-venda para")
 
 
 def test_render_heading_has_no_zero_jogos(tmp_path):
